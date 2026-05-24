@@ -1,0 +1,13 @@
+# Arquivos de dados originais (não precisam ir para o repositório)
+*.xlsx
+*.docx
+*.xls
+
+# Firebase CLI
+.firebase/
+firebase-debug.log
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
