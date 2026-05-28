@@ -4,97 +4,97 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clínica Neyliane Onofre — Sistema de Gestão</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-
-  <!-- Loading screen -->
-  <div id="app-loading" class="app-loading">
-    <div class="app-loading-spinner"></div>
-    <p>Carregando dados…</p>
-  </div>
-
-  <!-- Login overlay (shown only when Firebase Auth is configured) -->
-  <div id="login-overlay" class="auth-overlay">
-    <div class="auth-card">
-      <div class="auth-logo">🏥</div>
-      <h2>Clínica Neyliane Onofre</h2>
-      <p style="color:var(--text-muted);font-size:13px;margin-bottom:24px">Sistema de Gestão — Acesso Restrito</p>
-      <div class="form-group">
-        <label>E-mail</label>
-        <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="username">
-      </div>
-      <div class="form-group">
-        <label>Senha</label>
-        <input type="password" id="login-pwd" placeholder="••••••••" autocomplete="current-password">
-      </div>
-      <button class="btn btn-primary" id="login-btn" onclick="doLogin()" style="width:100%;margin-top:8px">Entrar</button>
-      <div id="login-error" style="color:var(--danger);font-size:13px;margin-top:10px;min-height:18px"></div>
+    <link rel="stylesheet" href="style.css?v=202605272306">
+  </head>
+  <body>
+  
+    <!-- Loading screen -->
+    <div id="app-loading" class="app-loading">
+      <div class="app-loading-spinner"></div>
+      <p>Carregando dados…</p>
     </div>
-  </div>
-
-  <div class="app" id="app">
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <div class="logo">
-          <span class="logo-icon">🏥</span>
-          <div class="logo-text">
-            <span class="logo-title">Clínica</span>
-            <span class="logo-subtitle">Neyliane Onofre</span>
+  
+    <!-- Login overlay (shown only when Firebase Auth is configured) -->
+    <div id="login-overlay" class="auth-overlay">
+      <div class="auth-card">
+        <div class="auth-logo">🏥</div>
+        <h2>Clínica Neyliane Onofre</h2>
+        <p style="color:var(--text-muted);font-size:13px;margin-bottom:24px">Sistema de Gestão — Acesso Restrito</p>
+        <div class="form-group">
+          <label>E-mail</label>
+          <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label>Senha</label>
+          <input type="password" id="login-pwd" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <button class="btn btn-primary" id="login-btn" onclick="doLogin()" style="width:100%;margin-top:8px">Entrar</button>
+        <div id="login-error" style="color:var(--danger);font-size:13px;margin-top:10px;min-height:18px"></div>
+      </div>
+    </div>
+  
+    <div class="app" id="app">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <div class="logo">
+            <span class="logo-icon">🏥</span>
+            <div class="logo-text">
+              <span class="logo-title">Clínica</span>
+              <span class="logo-subtitle">Neyliane Onofre</span>
+            </div>
           </div>
         </div>
-      </div>
-      <nav class="sidebar-nav" id="sidebar-nav">
-        <a class="nav-item" data-page="dashboard"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></a>
-        <a class="nav-item" data-page="profissionais"><span class="nav-icon">👩‍⚕️</span><span class="nav-label">Profissionais</span></a>
-        <a class="nav-item" data-page="pacientes"><span class="nav-icon">🧑</span><span class="nav-label">Pacientes</span></a>
-        <a class="nav-item" data-page="atendimentos"><span class="nav-icon">📋</span><span class="nav-label">Atendimentos</span></a>
-        <a class="nav-item" data-page="receitas"><span class="nav-icon">💵</span><span class="nav-label">Receitas</span></a>
-        <a class="nav-item" data-page="cobranca"><span class="nav-icon">💳</span><span class="nav-label">Cobrança</span></a>
-        <a class="nav-item" data-page="despesas"><span class="nav-icon">📉</span><span class="nav-label">Despesas</span></a>
-        <a class="nav-item" data-page="balancete"><span class="nav-icon">📈</span><span class="nav-label">Balancete</span></a>
-      </nav>
-      <div class="sidebar-footer">
-        <button class="theme-toggle" id="theme-toggle" title="Alternar tema">
-          <span id="theme-icon">🌙</span>
-          <span id="theme-label">Modo Escuro</span>
-        </button>
-        <button class="logout-btn" id="btn-logout" title="Sair do sistema">
-          <span>🔓</span><span>Sair</span>
-        </button>
-      </div>
-    </aside>
-
-    <div class="main-wrapper">
-      <header class="topbar">
-        <button class="menu-toggle" id="menu-toggle">☰</button>
-        <h1 class="topbar-title" id="topbar-title">Dashboard</h1>
-        <div class="topbar-right">
-          <span class="current-date" id="current-date"></span>
+        <nav class="sidebar-nav" id="sidebar-nav">
+          <a class="nav-item" data-page="dashboard"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></a>
+          <a class="nav-item" data-page="profissionais"><span class="nav-icon">👩‍⚕️</span><span class="nav-label">Profissionais</span></a>
+          <a class="nav-item" data-page="pacientes"><span class="nav-icon">🧑</span><span class="nav-label">Pacientes</span></a>
+          <a class="nav-item" data-page="atendimentos"><span class="nav-icon">📋</span><span class="nav-label">Atendimentos</span></a>
+          <a class="nav-item" data-page="receitas"><span class="nav-icon">💵</span><span class="nav-label">Receitas</span></a>
+          <a class="nav-item" data-page="cobranca"><span class="nav-icon">💳</span><span class="nav-label">Cobrança</span></a>
+          <a class="nav-item" data-page="despesas"><span class="nav-icon">📉</span><span class="nav-label">Despesas</span></a>
+          <a class="nav-item" data-page="balancete"><span class="nav-icon">📈</span><span class="nav-label">Balancete</span></a>
+        </nav>
+        <div class="sidebar-footer">
+          <button class="theme-toggle" id="theme-toggle" title="Alternar tema">
+            <span id="theme-icon">🌙</span>
+            <span id="theme-label">Modo Escuro</span>
+          </button>
+          <button class="logout-btn" id="btn-logout" title="Sair do sistema">
+            <span>🔓</span><span>Sair</span>
+          </button>
         </div>
-      </header>
-      <main class="content" id="content"></main>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="modal-overlay">
-    <div class="modal" id="modal">
-      <div class="modal-header">
-        <h3 class="modal-title" id="modal-title"></h3>
-        <button class="modal-close" id="modal-close">✕</button>
+      </aside>
+  
+      <div class="main-wrapper">
+        <header class="topbar">
+          <button class="menu-toggle" id="menu-toggle">☰</button>
+          <h1 class="topbar-title" id="topbar-title">Dashboard</h1>
+          <div class="topbar-right">
+            <span class="current-date" id="current-date"></span>
+          </div>
+        </header>
+        <main class="content" id="content"></main>
       </div>
-      <div class="modal-body" id="modal-body"></div>
-      <div class="modal-footer" id="modal-footer"></div>
     </div>
-  </div>
-
-  <div class="toast-container" id="toast-container"></div>
-
-  <!-- Firebase SDKs (compat v10) — só carregam após preencher FIREBASE_CONFIG em app.js -->
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="app.js"></script>
-</body>
-</html>
+  
+    <div class="modal-overlay" id="modal-overlay">
+      <div class="modal" id="modal">
+        <div class="modal-header">
+          <h3 class="modal-title" id="modal-title"></h3>
+          <button class="modal-close" id="modal-close">✕</button>
+        </div>
+        <div class="modal-body" id="modal-body"></div>
+        <div class="modal-footer" id="modal-footer"></div>
+      </div>
+    </div>
+  
+    <div class="toast-container" id="toast-container"></div>
+  
+    <!-- Firebase SDKs (compat v10) — só carregam após preencher FIREBASE_CONFIG em app.js -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="app.js?v=202605272306"></script>
+  </body>
+  </html>
