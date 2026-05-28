@@ -287,8 +287,14 @@ function renderDashboard() {
   const occGrid = {};
   DIAS_SEMANA_WORK.forEach(d => { occGrid[d]={}; TURNOS_NAMES.forEach(t => { occGrid[d][t]=[]; }); });
   profAtivos.forEach(p => {
-    (p.diasSemana||[]).forEach(d => {
-      (p.turnosTrabalho||[]).forEach(t => {
+    const agenda = p.agendaSemanal || (() => {
+      // migrate old format
+      const m = {};
+      (p.diasSemana||[]).forEach(d => { m[d] = [...(p.turnosTrabalho||[])]; });
+      return m;
+    })();
+    Object.entries(agenda).forEach(([d, turnos]) => {
+      (turnos||[]).forEach(t => {
         if (occGrid[d] && occGrid[d][t]) occGrid[d][t].push(p);
       });
     });
@@ -548,13 +554,23 @@ window.viewProf = (id) => {
         <div><label style="font-size:11px;color:var(--text-muted)">Total Atendimentos</label><div>${atends.length}</div></div>
         <div><label style="font-size:11px;color:var(--text-muted)">Receita Gerada</label><div style="color:var(--success);font-weight:700">${U.fmt(totalRec)}</div></div>
       </div>
-      ${(p.diasSemana||[]).length||((p.turnosTrabalho||[]).length) ? `
-        <div><label style="font-size:11px;color:var(--text-muted)">Agenda</label>
-          <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">
-            ${(p.diasSemana||[]).map(d=>`<span class="badge badge-info">${d}</span>`).join('')}
-            ${(p.turnosTrabalho||[]).map(t=>`<span class="badge badge-primary">${t}</span>`).join('')}
-          </div>
-        </div>` : ''}
+      ${(() => {
+        const agenda = p.agendaSemanal || (() => {
+          const m = {};
+          (p.diasSemana||[]).forEach(d => { m[d] = [...(p.turnosTrabalho||[])]; });
+          return m;
+        })();
+        const dias = DIAS_SEMANA_WORK.filter(d => (agenda[d]||[]).length > 0);
+        if (!dias.length) return '';
+        const TURNO_SHORT = { 'Manhã':'M', 'Tarde':'T', 'Noite':'N' };
+        return `<div><label style="font-size:11px;color:var(--text-muted)">Agenda</label>
+          <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">
+            ${dias.map(d => {
+              const ts = (agenda[d]||[]).map(t => `<span style="font-size:10px;font-weight:700;background:var(--primary);color:#fff;border-radius:3px;padding:1px 4px">${TURNO_SHORT[t]||t}</span>`).join('');
+              return `<div style="display:flex;align-items:center;gap:4px;background:var(--surface-2);border-radius:6px;padding:4px 8px;font-size:12px"><span style="font-weight:600">${d}</span>${ts}</div>`;
+            }).join('')}
+          </div></div>`;
+      })()}
       ${(p.salasOcupadas||[]).length ? `<div><label style="font-size:11px;color:var(--text-muted)">Salas</label><div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${(p.salasOcupadas||[]).map(s=>`<span class="badge badge-gray">${s}</span>`).join('')}</div></div>` : ''}
       ${p.obs ? `<div><label style="font-size:11px;color:var(--text-muted)">Observações</label><div>${U.escHtml(p.obs)}</div></div>` : ''}
     </div>`,
@@ -622,15 +638,33 @@ window.editProf = (id) => {
         <div class="form-group"><label>Valor Estacionamento (R$/mês)</label><input id="f-valorEstac" type="number" step="0.01" value="${v('valorEstacionamento',0)}"></div>
 
         <div class="form-section-title">Agenda Semanal</div>
-        <div class="form-group form-full"><label>Dias da Semana</label>
-          <div style="display:flex;gap:12px;flex-wrap:wrap;padding:6px 0">
-            ${DIAS_SEMANA_WORK.map(d=>`<label class="form-check"><input type="checkbox" class="f-dia" value="${d}" ${(v('diasSemana',[])||[]).includes(d)?'checked':''}> ${d}</label>`).join('')}
-          </div>
-        </div>
-        <div class="form-group form-full"><label>Turnos de Trabalho</label>
-          <div style="display:flex;gap:20px;flex-wrap:wrap;padding:6px 0">
-            ${TURNOS_NAMES.map(t=>`<label class="form-check"><input type="checkbox" class="f-turno" value="${t}" ${(v('turnosTrabalho',[])||[]).includes(t)?'checked':''}> ${t}</label>`).join('')}
-          </div>
+        <div class="form-group form-full">
+          <label style="margin-bottom:8px;display:block">Dias e Turnos <span style="font-size:11px;color:var(--text-muted);font-weight:400">(M = Manhã, T = Tarde, N = Noite)</span></label>
+          ${(() => {
+            const agenda = v('agendaSemanal',null) || (() => {
+              const m = {};
+              (v('diasSemana',[])||[]).forEach(d => { m[d] = [...(v('turnosTrabalho',[])||[])]; });
+              return m;
+            })();
+            return `<div style="display:grid;gap:6px">
+              ${DIAS_SEMANA_WORK.map(d => {
+                const ts = agenda[d] || [];
+                return `<div style="display:flex;align-items:center;gap:10px;background:var(--surface-2);border-radius:8px;padding:8px 12px">
+                  <span style="min-width:36px;font-weight:600;font-size:13px">${d}</span>
+                  <div style="display:flex;gap:6px">
+                    ${['Manhã','Tarde','Noite'].map(turno => {
+                      const short = turno[0];
+                      const checked = ts.includes(turno) ? 'checked' : '';
+                      return `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none">
+                        <input type="checkbox" class="f-agenda" data-dia="${d}" data-turno="${turno}" ${checked} style="display:none">
+                        <span class="turno-pill" data-dia="${d}" data-turno="${turno}" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid ${ts.includes(turno)?'var(--primary)':'var(--border)'};background:${ts.includes(turno)?'var(--primary)':'transparent'};color:${ts.includes(turno)?'#fff':'var(--text-muted)'}">${short}</span>
+                      </label>`;
+                    }).join('')}
+                  </div>
+                </div>`;
+              }).join('')}
+            </div>`;
+          })()}
         </div>
         <div class="form-group form-full"><label>Salas Ocupadas</label>
           <div style="display:flex;gap:12px;flex-wrap:wrap;padding:6px 0">
@@ -648,6 +682,19 @@ window.editProf = (id) => {
   `<button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button>
    <button class="btn btn-primary" onclick="saveProf()">💾 Salvar</button>`, 'lg');
   regimeFields();
+  // Wire up turno pills toggle
+  document.getElementById('modal-body').addEventListener('click', e => {
+    const pill = e.target.closest('.turno-pill');
+    if (!pill) return;
+    const dia = pill.dataset.dia, turno = pill.dataset.turno;
+    const cb = document.querySelector(`.f-agenda[data-dia="${dia}"][data-turno="${turno}"]`);
+    if (!cb) return;
+    cb.checked = !cb.checked;
+    const on = cb.checked;
+    pill.style.background = on ? 'var(--primary)' : 'transparent';
+    pill.style.borderColor = on ? 'var(--primary)' : 'var(--border)';
+    pill.style.color = on ? '#fff' : 'var(--text-muted)';
+  });
 };
 
 window.saveProf = () => {
@@ -669,8 +716,17 @@ window.saveProf = () => {
     ativo: g('f-ativo').checked, obs: g('f-obs').value.trim(),
     createdAt: id ? (DB.getOne('profissionais',id)||{}).createdAt : new Date().toISOString()
   };
-  base.diasSemana = [...document.querySelectorAll('.f-dia:checked')].map(el=>el.value);
-  base.turnosTrabalho = [...document.querySelectorAll('.f-turno:checked')].map(el=>el.value);
+  // New per-day schedule
+  const agenda = {};
+  document.querySelectorAll('.f-agenda:checked').forEach(el => {
+    const dia = el.dataset.dia, turno = el.dataset.turno;
+    if (!agenda[dia]) agenda[dia] = [];
+    agenda[dia].push(turno);
+  });
+  base.agendaSemanal = agenda;
+  // Keep legacy fields for backward compat
+  base.diasSemana = Object.keys(agenda);
+  base.turnosTrabalho = [...new Set(Object.values(agenda).flat())];
   base.salasOcupadas = [...document.querySelectorAll('.f-sala:checked')].map(el=>el.value);
   if (regime==='sublocacao') { base.valorMensal=U.parseNum(g('f-valorMensal')?.value); base.valorHoraExtra=U.parseNum(g('f-valorHoraExtra')?.value)||50; }
   if (regime==='hora') { base.valorHora=U.parseNum(g('f-valorHora')?.value); }
