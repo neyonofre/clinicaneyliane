@@ -633,7 +633,7 @@ window.editProf = (id) => {
 
   window._regimeFields = regimeFields;
   Modal.open(p ? 'Editar Profissional' : 'Novo Profissional', `
-    <form id="prof-form">
+    <div id="prof-form">
       <input type="hidden" id="f-prof-id" value="${U.escHtml(id||'')}">
       <div class="form-grid">
         <div class="form-section-title">Dados Pessoais</div>
@@ -683,7 +683,7 @@ window.editProf = (id) => {
         </div>
         <div class="form-group form-full"><label>Observações</label><textarea id="f-obs">${U.escHtml(v('obs'))}</textarea></div>
       </div>
-    </form>`,
+    </div>`,
   `<button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button>
    <button class="btn btn-primary" onclick="saveProf()">💾 Salvar</button>`, 'lg');
   regimeFields();
@@ -705,23 +705,33 @@ window.editProf = (id) => {
 
 
 window.saveProf = () => {
+  try {
   const g = (i) => document.getElementById(i);
   const id = g('f-prof-id')?.value?.trim() || '';
   const nome = g('f-nome')?.value?.trim();
   if (!nome) { toast('Nome é obrigatório','error'); return; }
-  const regime = g('f-regime').value;
+  const regime = g('f-regime')?.value || '';
+  if (!regime) { toast('Regime é obrigatório','error'); return; }
   const base = {
     id: id || U.id(),
-    nome, cpf: g('f-cpf').value.trim(), cnpj: g('f-cnpj').value.trim(),
-    profissao: g('f-profissao').value.trim(), especialidade: g('f-especialidade').value.trim(),
-    conselho: g('f-conselho').value.trim(), celular: g('f-celular').value.trim(),
-    whatsapp: g('f-whatsapp').value.trim(), email: g('f-email').value.trim(),
-    endereco: g('f-endereco').value.trim(), dataContrato: g('f-dataContrato').value,
-    regime, diaVencimento: parseInt(g('f-diaVencimento').value)||5,
-    usaEstacionamento: g('f-usaEstac').checked,
-    valorEstacionamento: U.parseNum(g('f-valorEstac').value),
-    ativo: g('f-ativo').checked, obs: g('f-obs').value.trim(),
-    createdAt: id ? (DB.getOne('profissionais',id)||{}).createdAt : new Date().toISOString()
+    nome,
+    cpf: g('f-cpf')?.value?.trim() || '',
+    cnpj: g('f-cnpj')?.value?.trim() || '',
+    profissao: g('f-profissao')?.value?.trim() || '',
+    especialidade: g('f-especialidade')?.value?.trim() || '',
+    conselho: g('f-conselho')?.value?.trim() || '',
+    celular: g('f-celular')?.value?.trim() || '',
+    whatsapp: g('f-whatsapp')?.value?.trim() || '',
+    email: g('f-email')?.value?.trim() || '',
+    endereco: g('f-endereco')?.value?.trim() || '',
+    dataContrato: g('f-dataContrato')?.value || '',
+    regime,
+    diaVencimento: parseInt(g('f-diaVencimento')?.value) || 5,
+    usaEstacionamento: g('f-usaEstac')?.checked || false,
+    valorEstacionamento: U.parseNum(g('f-valorEstac')?.value || '0'),
+    ativo: g('f-ativo')?.checked !== false,
+    obs: g('f-obs')?.value?.trim() || '',
+    createdAt: id ? (DB.getOne('profissionais', id) || {}).createdAt : new Date().toISOString()
   };
   // New per-day schedule
   const agenda = {};
@@ -731,19 +741,22 @@ window.saveProf = () => {
     agenda[dia].push(turno);
   });
   base.agendaSemanal = agenda;
-  // Keep legacy fields for backward compat
   base.diasSemana = Object.keys(agenda);
   base.turnosTrabalho = [...new Set(Object.values(agenda).flat())];
-  base.salasOcupadas = [...document.querySelectorAll('.f-sala:checked')].map(el=>el.value);
-  if (regime==='sublocacao') { base.valorMensal=U.parseNum(g('f-valorMensal')?.value); base.valorHoraExtra=U.parseNum(g('f-valorHoraExtra')?.value)||50; }
-  if (regime==='hora') { base.valorHora=U.parseNum(g('f-valorHora')?.value); }
-  if (regime==='cliente') { base.valorPorCliente=U.parseNum(g('f-valorPorCliente')?.value); }
-  if (regime==='porcentagem') { base.percentualClinica=parseFloat(g('f-percentualClinica')?.value)||60; base.percentualProprioClinica=parseFloat(g('f-percentualProprioClinica')?.value)||base.percentualClinica; }
-  if (regime==='turno') { base.valorTurno=U.parseNum(g('f-valorTurno')?.value); base.valorHoraExtra=U.parseNum(g('f-valorHoraExtra')?.value)||50; }
+  base.salasOcupadas = [...document.querySelectorAll('.f-sala:checked')].map(el => el.value);
+  if (regime === 'sublocacao') { base.valorMensal = U.parseNum(g('f-valorMensal')?.value || '0'); base.valorHoraExtra = U.parseNum(g('f-valorHoraExtra')?.value || '50') || 50; }
+  if (regime === 'hora') { base.valorHora = U.parseNum(g('f-valorHora')?.value || '0'); }
+  if (regime === 'cliente') { base.valorPorCliente = U.parseNum(g('f-valorPorCliente')?.value || '0'); }
+  if (regime === 'porcentagem') { base.percentualClinica = parseFloat(g('f-percentualClinica')?.value) || 60; base.percentualProprioClinica = parseFloat(g('f-percentualProprioClinica')?.value) || base.percentualClinica; }
+  if (regime === 'turno') { base.valorTurno = U.parseNum(g('f-valorTurno')?.value || '0'); base.valorHoraExtra = U.parseNum(g('f-valorHoraExtra')?.value || '50') || 50; }
   DB.save('profissionais', base);
   Modal.close();
   toast(id ? 'Profissional atualizado!' : 'Profissional cadastrado!', 'success');
   renderProfissionais();
+  } catch(err) {
+    console.error('Erro ao salvar profissional:', err);
+    toast('Erro ao salvar: ' + err.message, 'error');
+  }
 };
 
 window.delProf = (id) => {
