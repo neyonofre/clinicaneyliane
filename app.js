@@ -731,7 +731,7 @@ window.saveProf = () => {
     valorEstacionamento: U.parseNum(g('f-valorEstac')?.value || '0'),
     ativo: g('f-ativo')?.checked !== false,
     obs: g('f-obs')?.value?.trim() || '',
-    createdAt: id ? (DB.getOne('profissionais', id) || {}).createdAt : new Date().toISOString()
+    createdAt: (id && (DB.getOne('profissionais', id) || {}).createdAt) ? DB.getOne('profissionais', id).createdAt : new Date().toISOString()
   };
   // New per-day schedule
   const agenda = {};
