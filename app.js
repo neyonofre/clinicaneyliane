@@ -688,13 +688,12 @@ window.editProf = (id) => {
    <button class="btn btn-primary" onclick="saveProf()">💾 Salvar</button>`, 'lg');
   regimeFields();
   // Wire up turno pills toggle
-  document.getElementById('modal-body').addEventListener('click', e => {
-    const pill = e.target.closest('.turno-pill');
+  document.getElementById('modal-body').addEventListener('change', e => {
+    if (!e.target.classList.contains('f-agenda')) return;
+    const cb = e.target;
+    const dia = cb.dataset.dia, turno = cb.dataset.turno;
+    const pill = document.querySelector(`.turno-pill[data-dia="${dia}"][data-turno="${turno}"]`);
     if (!pill) return;
-    const dia = pill.dataset.dia, turno = pill.dataset.turno;
-    const cb = document.querySelector(`.f-agenda[data-dia="${dia}"][data-turno="${turno}"]`);
-    if (!cb) return;
-    cb.checked = !cb.checked;
     const on = cb.checked;
     pill.style.background = on ? 'var(--primary)' : 'transparent';
     pill.style.borderColor = on ? 'var(--primary)' : 'var(--border)';
