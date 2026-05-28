@@ -285,17 +285,28 @@ function renderDashboard() {
   // Occupancy grid
   const profAtivos = DB.get('profissionais').filter(p => p.ativo);
   const occGrid = {};
-  DIAS_SEMANA_WORK.forEach(d => { occGrid[d]={}; TURNOS_NAMES.forEach(t => { occGrid[d][t]=[]; }); });
+  SALAS.forEach(s => {
+    occGrid[s] = {};
+    DIAS_SEMANA_WORK.forEach(d => {
+      occGrid[s][d] = {};
+      TURNOS_NAMES.forEach(t => { occGrid[s][d][t] = []; });
+    });
+  });
+
   profAtivos.forEach(p => {
     const agenda = p.agendaSemanal || (() => {
-      // migrate old format
       const m = {};
       (p.diasSemana||[]).forEach(d => { m[d] = [...(p.turnosTrabalho||[])]; });
       return m;
     })();
+    const salas = p.salasOcupadas || [];
     Object.entries(agenda).forEach(([d, turnos]) => {
       (turnos||[]).forEach(t => {
-        if (occGrid[d] && occGrid[d][t]) occGrid[d][t].push(p);
+        salas.forEach(s => {
+          if (occGrid[s] && occGrid[s][d] && occGrid[s][d][t]) {
+            occGrid[s][d][t].push(p);
+          }
+        });
       });
     });
   });
@@ -324,22 +335,34 @@ function renderDashboard() {
   const content = document.getElementById('content');
   // Occupancy grid HTML
   const occHtml = `
-    <table style="width:100%;border-collapse:collapse;text-align:center;font-size:12px">
-      <thead><tr>
-        <th style="padding:8px 10px;background:var(--surface-2);border:1px solid var(--border);font-weight:700;min-width:60px">Turno</th>
-        ${DIAS_SEMANA_WORK.map(d=>`<th style="padding:8px;background:var(--surface-2);border:1px solid var(--border);font-weight:700">${d}</th>`).join('')}
-      </tr></thead>
-      <tbody>${TURNOS_NAMES.map(t=>`<tr>
-        <td style="padding:8px 10px;border:1px solid var(--border);font-weight:700;background:var(--surface-2)">${t}</td>
-        ${DIAS_SEMANA_WORK.map(d=>{
-          const ps=occGrid[d][t]; const n=ps.length;
-          const bg=n===0?'var(--surface-3)':n<=2?'rgba(34,197,94,0.18)':n<=4?'rgba(34,197,94,0.4)':'rgba(34,197,94,0.7)';
-          const col=n>=5?'#fff':'var(--text)';
-          const tip=ps.map(p=>p.nome).join('\n')||'Livre';
-          return `<td style="padding:10px 6px;border:1px solid var(--border);background:${bg};color:${col};cursor:${n>0?'pointer':'default'};transition:opacity 0.15s" title="${U.escHtml(tip)}" onclick="showOccCell('${d}','${t}')">${n>0?`<strong>${n}</strong><br><span style="font-size:10px;opacity:0.8">${ps.slice(0,2).map(p=>p.nome.split(' ')[0]).join(', ')}${ps.length>2?'…':''}</span>`:'—'}</td>`;
-        }).join('')}
-      </tr>`).join('')}</tbody>
-    </table>`;
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;text-align:center;font-size:12px;min-width:600px">
+        <thead><tr>
+          <th style="padding:8px 10px;background:var(--surface-2);border:1px solid var(--border);font-weight:700;text-align:left">Sala</th>
+          ${DIAS_SEMANA_WORK.map(d=>`<th style="padding:8px;background:var(--surface-2);border:1px solid var(--border);font-weight:700">${d}</th>`).join('')}
+        </tr></thead>
+        <tbody>${SALAS.map(s=>`<tr>
+          <td style="padding:8px 10px;border:1px solid var(--border);font-weight:600;background:var(--surface-2);text-align:left;white-space:nowrap">${s}</td>
+          ${DIAS_SEMANA_WORK.map(d=>{
+            const pillsHtml = TURNOS_NAMES.map(t => {
+              const ps = occGrid[s][d][t];
+              const isOccupied = ps.length > 0;
+              const title = isOccupied ? t + '\\n' + ps.map(p=>p.nome).join('\\n') : t + ' - Livre';
+              const bg = ps.length > 1 ? '#a855f7' : isOccupied ? 'var(--danger)' : 'rgba(34,197,94,0.15)';
+              const bcol = ps.length > 1 ? '#a855f7' : isOccupied ? 'var(--danger)' : 'rgba(34,197,94,0.4)';
+              const col = isOccupied ? '#fff' : 'var(--text-muted)';
+              return `<span title="${U.escHtml(title)}" style="display:inline-block;width:22px;height:22px;line-height:20px;text-align:center;border-radius:4px;background:${bg};color:${col};border:1px solid ${bcol};font-size:10px;font-weight:bold;cursor:help">${t[0]}</span>`;
+            }).join('<span style="width:4px;display:inline-block"></span>');
+            return `<td style="padding:8px;border:1px solid var(--border);white-space:nowrap">${pillsHtml}</td>`;
+          }).join('')}
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:16px;font-size:11px;color:var(--text-muted);justify-content:center">
+      <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:2px;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.4)"></span> Livre</span>
+      <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:2px;background:var(--danger)"></span> Ocupado</span>
+      <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:2px;background:#a855f7"></span> Conflito (+1 prof.)</span>
+    </div>`;
 
   content.innerHTML = `
     <div class="kpi-grid">
