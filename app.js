@@ -591,6 +591,7 @@ window.editProf = (id) => {
   window._regimeFields = regimeFields;
   Modal.open(p ? 'Editar Profissional' : 'Novo Profissional', `
     <form id="prof-form">
+      <input type="hidden" id="f-prof-id" value="${U.escHtml(id||'')}">
       <div class="form-grid">
         <div class="form-section-title">Dados Pessoais</div>
         <div class="form-group form-full"><label>Nome Completo *</label><input id="f-nome" value="${U.escHtml(v('nome'))}" required></div>
@@ -645,12 +646,13 @@ window.editProf = (id) => {
       </div>
     </form>`,
   `<button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button>
-   <button class="btn btn-primary" onclick="saveProf('${id||''}')">💾 Salvar</button>`, 'lg');
+   <button class="btn btn-primary" onclick="saveProf()">💾 Salvar</button>`, 'lg');
   regimeFields();
 };
 
-window.saveProf = (id) => {
+window.saveProf = () => {
   const g = (i) => document.getElementById(i);
+  const id = g('f-prof-id')?.value?.trim() || '';
   const nome = g('f-nome')?.value?.trim();
   if (!nome) { toast('Nome é obrigatório','error'); return; }
   const regime = g('f-regime').value;
