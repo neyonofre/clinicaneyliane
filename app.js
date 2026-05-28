@@ -604,6 +604,33 @@ window.editProf = (id) => {
       <div class="form-group"><label>Valor Hora Extra (R$)</label><input id="f-valorHoraExtra" type="number" step="0.01" value="${v('valorHoraExtra',50)}"></div>`;
   };
 
+  // Build agenda grid HTML before Modal.open to avoid nested template literal issues
+  const existingAgenda = p ? (p.agendaSemanal || (() => {
+    const m = {};
+    (p.diasSemana || []).forEach(d => { m[d] = [...(p.turnosTrabalho || [])]; });
+    return m;
+  })()) : {};
+  const agendaHtml = '<div style="display:grid;gap:6px">' +
+    DIAS_SEMANA_WORK.map(d => {
+      const ts = existingAgenda[d] || [];
+      const pills = TURNOS_NAMES.map(turno => {
+        const short = turno[0];
+        const on = ts.includes(turno);
+        const border = on ? 'var(--primary)' : 'var(--border)';
+        const bg = on ? 'var(--primary)' : 'transparent';
+        const color = on ? '#fff' : 'var(--text-muted)';
+        const checked = on ? 'checked' : '';
+        return `<label style="display:flex;align-items:center;cursor:pointer;user-select:none">` +
+          `<input type="checkbox" class="f-agenda" data-dia="${d}" data-turno="${turno}" ${checked} style="display:none">` +
+          `<span class="turno-pill" data-dia="${d}" data-turno="${turno}" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid ${border};background:${bg};color:${color}">${short}</span>` +
+          `</label>`;
+      }).join('');
+      return `<div style="display:flex;align-items:center;gap:10px;background:var(--surface-2);border-radius:8px;padding:8px 12px">` +
+        `<span style="min-width:36px;font-weight:600;font-size:13px">${d}</span>` +
+        `<div style="display:flex;gap:6px">${pills}</div>` +
+        `</div>`;
+    }).join('') + '</div>';
+
   window._regimeFields = regimeFields;
   Modal.open(p ? 'Editar Profissional' : 'Novo Profissional', `
     <form id="prof-form">
@@ -639,33 +666,11 @@ window.editProf = (id) => {
 
         <div class="form-section-title">Agenda Semanal</div>
         <div class="form-group form-full">
-          <label style="margin-bottom:8px;display:block">Dias e Turnos <span style="font-size:11px;color:var(--text-muted);font-weight:400">(M = Manhã, T = Tarde, N = Noite)</span></label>
-          ${(() => {
-            const agenda = v('agendaSemanal',null) || (() => {
-              const m = {};
-              (v('diasSemana',[])||[]).forEach(d => { m[d] = [...(v('turnosTrabalho',[])||[])]; });
-              return m;
-            })();
-            return `<div style="display:grid;gap:6px">
-              ${DIAS_SEMANA_WORK.map(d => {
-                const ts = agenda[d] || [];
-                return `<div style="display:flex;align-items:center;gap:10px;background:var(--surface-2);border-radius:8px;padding:8px 12px">
-                  <span style="min-width:36px;font-weight:600;font-size:13px">${d}</span>
-                  <div style="display:flex;gap:6px">
-                    ${['Manhã','Tarde','Noite'].map(turno => {
-                      const short = turno[0];
-                      const checked = ts.includes(turno) ? 'checked' : '';
-                      return `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none">
-                        <input type="checkbox" class="f-agenda" data-dia="${d}" data-turno="${turno}" ${checked} style="display:none">
-                        <span class="turno-pill" data-dia="${d}" data-turno="${turno}" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid ${ts.includes(turno)?'var(--primary)':'var(--border)'};background:${ts.includes(turno)?'var(--primary)':'transparent'};color:${ts.includes(turno)?'#fff':'var(--text-muted)'}">${short}</span>
-                      </label>`;
-                    }).join('')}
-                  </div>
-                </div>`;
-              }).join('')}
-            </div>`;
-          })()}
+          <label style="margin-bottom:8px;display:block">Dias e Turnos <span style="font-size:11px;color:var(--text-muted);font-weight:400">(M = Manhã &nbsp; T = Tarde &nbsp; N = Noite)</span></label>
+          ${agendaHtml}
         </div>
+
+        <div class="form-section-title">Salas</div>
         <div class="form-group form-full"><label>Salas Ocupadas</label>
           <div style="display:flex;gap:12px;flex-wrap:wrap;padding:6px 0">
             ${SALAS.map(s=>`<label class="form-check"><input type="checkbox" class="f-sala" value="${s}" ${(v('salasOcupadas',[])||[]).includes(s)?'checked':''}> ${s}</label>`).join('')}
@@ -696,6 +701,8 @@ window.editProf = (id) => {
     pill.style.color = on ? '#fff' : 'var(--text-muted)';
   });
 };
+
+
 
 window.saveProf = () => {
   const g = (i) => document.getElementById(i);
