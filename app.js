@@ -1145,7 +1145,7 @@ function renderCobranca() {
     const list = DB.get('cobrancas');
     const idx = list.findIndex(c=>c.profissionalId===profId&&c.ano===ano&&c.mes===mes);
     const p = DB.getOne('profissionais', profId);
-    const he = { id:idx>=0?list[idx].id:U.id(), profissionalId:profId, ano, mes, qtdHorasExtras:qtd, valorHorasExtras:qtd*(p?.valorHoraExtra||50), ...(idx>=0?list[idx]:{}) };
+    const he = { ...(idx>=0?list[idx]:{}), id:idx>=0?list[idx].id:U.id(), profissionalId:profId, ano, mes, qtdHorasExtras:qtd, valorHorasExtras:qtd*(p?.valorHoraExtra||50) };
     if (idx>=0) list[idx]=he; else list.push(he);
     DB.set('cobrancas', list);
     Modal.close(); toast('Horas extras salvas!','success'); draw();
