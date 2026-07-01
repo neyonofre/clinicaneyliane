@@ -533,6 +533,13 @@ tbody tr:hover td { background: var(--surface-2); }
 .month-nav button { padding: 6px 10px; border-radius: var(--radius-sm); background: var(--surface-3); color: var(--text); font-size: 18px; transition: var(--transition); }
 .month-nav button:hover { background: var(--border); }
 .month-nav .month-label { font-size: 16px; font-weight: 700; min-width: 140px; text-align: center; }
+.month-label-wrap { position: relative; display: inline-flex; align-items: center; border-radius: var(--radius-sm); transition: var(--transition); }
+.month-label-wrap:hover { background: var(--surface-3); }
+.month-label-wrap .month-label { cursor: pointer; }
+.month-label-input {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; border: 0; padding: 0; margin: 0; cursor: pointer;
+}
 
 /* ===== OCCUPANCY GRID ===== */
 .occ-grid td { transition: opacity 0.15s; }

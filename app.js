@@ -161,6 +161,14 @@ const U = {
   },
   date: (iso) => { if (!iso) return ''; const [y,m,d] = iso.split('-'); return `${d}/${m}/${y}`; },
   isoToday: () => new Date().toISOString().split('T')[0],
+  // Parses a 'YYYY-MM-DD' string as a LOCAL date (avoids the classic new Date('YYYY-MM-DD')
+  // UTC-midnight bug that shifts the date back a day in timezones behind UTC).
+  parseISODate: (iso) => {
+    if (!iso) return null;
+    const [y,m,d] = iso.split('-').map(Number);
+    if (!y || !m) return null;
+    return new Date(y, m-1, d||1);
+  },
   monthKey: (y,m) => `${y}-${String(m).padStart(2,'0')}`,
   parseNum: (s) => parseFloat(String(s).replace(/[^\d,.-]/g,'').replace(',','.')) || 0,
   escHtml: (s) => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'),
@@ -221,10 +229,35 @@ const Modal = {
   }
 };
 
+/* ===== PAGE STATE (persists currently-viewed month/filters across re-renders) ===== */
+const _now0 = new Date();
+const PageState = {
+  atendimentos: { y: _now0.getFullYear(), m: _now0.getMonth()+1, filterProf: '' },
+  despesas: { y: _now0.getFullYear(), m: _now0.getMonth()+1, filterCat: '' },
+  receitas: { y: _now0.getFullYear(), m: _now0.getMonth()+1 },
+  balancete: { y: _now0.getFullYear(), m: _now0.getMonth()+1, viewType: 'mensal' }
+};
+
 /* ===== HELPERS ===== */
+// A profissional só entra no cálculo de sublocação/turno nos meses em que o contrato
+// já havia começado e, se foi desativado, até o mês da desativação (dataInativacao).
+function profissionalAtivoNoMes(p, yr, mo) {
+  const monthStart = new Date(yr, mo-1, 1);
+  const monthEnd = new Date(yr, mo, 0);
+  if (p.dataContrato) {
+    const start = U.parseISODate(p.dataContrato);
+    if (start && start > monthEnd) return false;
+  }
+  if (!p.ativo) {
+    const cutoff = p.dataInativacao ? U.parseISODate(p.dataInativacao) : new Date();
+    if (cutoff && cutoff < monthStart) return false;
+  }
+  return true;
+}
+
 function getSublocacaoRevenue(yr, mo) {
   return DB.get('profissionais')
-    .filter(p => p.ativo && ['sublocacao','turno'].includes(p.regime))
+    .filter(p => ['sublocacao','turno'].includes(p.regime) && profissionalAtivoNoMes(p, yr, mo))
     .reduce((s, p) => {
       const c = DB.get('cobrancas').find(c2 => c2.profissionalId===p.id && c2.ano===yr && c2.mes===mo) || {};
       const base = p.regime==='sublocacao' ? (p.valorMensal||0) : (p.valorTurno||0);
@@ -241,7 +274,96 @@ function getAllRecCats() {
   return [...CATS_RECEITA, ...DB.get('custom_rec_cats')];
 }
 function getReceitasMonth(yr, mo) {
-  return DB.get('receitas').filter(r => { const d=new Date(r.data); return d.getFullYear()===yr && d.getMonth()+1===mo; });
+  return DB.get('receitas').filter(r => { const d=U.parseISODate(r.data); return d && d.getFullYear()===yr && d.getMonth()+1===mo; });
+}
+
+// Consolida todas as fontes de receita do mês (sublocação, porcentagem, por cliente, por hora
+// e lançamentos manuais de "outras receitas"). Usado tanto na página de Receitas quanto no Balancete.
+function calcReceitasMes(yr, mo) {
+  const atends = DB.get('atendimentos').filter(a => { const d=U.parseISODate(a.data); return d && d.getFullYear()===yr && d.getMonth()+1===mo; });
+  let rPorcentagem = 0, rCliente = 0, rHora = 0;
+  atends.forEach(a => {
+    const p = DB.getOne('profissionais', a.profissionalId);
+    if (!p) return;
+    const rep = U.calcRepasse(a);
+    if (p.regime === 'porcentagem') rPorcentagem += rep;
+    else if (p.regime === 'cliente') rCliente += rep;
+    else if (p.regime === 'hora') rHora += rep;
+  });
+  const rSubl = getSublocacaoRevenue(yr, mo);
+  const rOutras = getReceitasMonth(yr, mo).reduce((s,r) => s+(r.valor||0), 0);
+  return { rSubl, rPorcentagem, rCliente, rHora, rOutras, totalReceita: rSubl+rPorcentagem+rCliente+rHora+rOutras };
+}
+
+function getManualSaldoBanco(yr, mo) {
+  return getReceitasMonth(yr, mo).filter(r=>r.categoria==='saldo_banco').reduce((s,r)=>s+(r.valor||0),0);
+}
+
+// Existe algum lançamento (atendimento/despesa/receita/contrato de sublocação) datado antes
+// do início deste mês? Usado para achar o mês "gênese" a partir do qual o saldo bancário
+// anterior passa a ser importado automaticamente do resultado do mês anterior.
+function hasDataBeforeMonth(yr, mo) {
+  const cutoff = new Date(yr, mo-1, 1);
+  const before = (iso) => { const d = U.parseISODate(iso); return d && d < cutoff; };
+  if (DB.get('atendimentos').some(a => before(a.data))) return true;
+  if (DB.get('despesas').some(d => before(d.data))) return true;
+  if (DB.get('receitas').some(r => before(r.data))) return true;
+  if (DB.get('profissionais').some(p => ['sublocacao','turno'].includes(p.regime) && before(p.dataContrato))) return true;
+  return false;
+}
+
+// Saldo Anterior — Banco de um mês = resultado do mês anterior (encadeado recursivamente).
+// No mês "gênese" (sem nenhum lançamento anterior no sistema) usa o valor manual informado
+// em Receitas, que serve como saldo inicial de partida.
+function getSaldoAnteriorBanco(yr, mo, cache = {}) {
+  const key = yr + '-' + mo;
+  if (key in cache) return cache[key];
+  let val;
+  if (!hasDataBeforeMonth(yr, mo)) {
+    val = getManualSaldoBanco(yr, mo);
+  } else {
+    let pm = mo - 1, py = yr;
+    if (pm < 1) { pm = 12; py--; }
+    val = calcMonth(py, pm, cache).resultado;
+  }
+  cache[key] = val;
+  return val;
+}
+
+// Cálculo completo do balancete de um mês (receitas por origem, despesas por grupo, resultado).
+// Compartilhado pelas páginas de Receitas e Balancete.
+function calcMonth(yr, mo, cache = {}) {
+  const rec = calcReceitasMes(yr, mo);
+  const desps = DB.get('despesas').filter(d=>{ const dt=U.parseISODate(d.data); return dt && dt.getFullYear()===yr && dt.getMonth()+1===mo; });
+  const saldoBancoAnterior = getSaldoAnteriorBanco(yr, mo, cache);
+  const rOutras = rec.rOutras - getManualSaldoBanco(yr, mo) + saldoBancoAnterior;
+  const totalReceita = rec.rSubl + rec.rPorcentagem + rec.rCliente + rec.rHora + rOutras;
+  const dPessoal = desps.filter(d=>d.categoria==='2').reduce((s,d)=>s+(d.valor||0),0);
+  const dFixas = desps.filter(d=>d.categoria==='3').reduce((s,d)=>s+(d.valor||0),0);
+  const dVariaveis = desps.filter(d=>d.categoria==='4').reduce((s,d)=>s+(d.valor||0),0);
+  const totalDespesa = dPessoal + dFixas + dVariaveis;
+  return { rSubl:rec.rSubl, rPorcentagem:rec.rPorcentagem, rCliente:rec.rCliente, rHora:rec.rHora, rOutras, saldoBancoAnterior,
+    totalReceita, dPessoal, dFixas, dVariaveis, totalDespesa, resultado: totalReceita - totalDespesa };
+}
+
+// Abre um seletor de data nativo (dias/meses/anos) ancorado no rótulo do mês de uma página,
+// permitindo pular direto para qualquer mês em vez de clicar em ‹ › repetidamente.
+function wireMonthPicker(prefix, state, onNavigate) {
+  const input = document.getElementById(prefix + '-month-input');
+  const label = document.getElementById(prefix + '-month-label');
+  if (!input || !label) return;
+  function sync() {
+    label.textContent = `${MESES[state.m-1]} ${state.y}`;
+    input.value = `${state.y}-${String(state.m).padStart(2,'0')}-01`;
+  }
+  input.onchange = (e) => {
+    const [yy, mm] = e.target.value.split('-').map(Number);
+    if (!yy || !mm) return;
+    state.y = yy; state.m = mm;
+    sync();
+    onNavigate();
+  };
+  sync();
 }
 
 /* ===== ROUTER ===== */
@@ -270,8 +392,8 @@ const Router = {
 function renderDashboard() {
   const now = new Date();
   const y = now.getFullYear(), m = now.getMonth()+1;
-  const atends = DB.get('atendimentos').filter(a => { const d=new Date(a.data); return d.getFullYear()===y && d.getMonth()+1===m; });
-  const desps = DB.get('despesas').filter(d => { const dt=new Date(d.data); return dt.getFullYear()===y && dt.getMonth()+1===m; });
+  const atends = DB.get('atendimentos').filter(a => { const d=U.parseISODate(a.data); return d && d.getFullYear()===y && d.getMonth()+1===m; });
+  const desps = DB.get('despesas').filter(d => { const dt=U.parseISODate(d.data); return dt && dt.getFullYear()===y && dt.getMonth()+1===m; });
   const cobrs = DB.get('cobrancas').filter(c => c.ano===y && c.mes===m);
 
   let receitaAtend = atends.reduce((s,a) => s + U.calcRepasse(a), 0);
@@ -317,9 +439,9 @@ function renderDashboard() {
     const dt = new Date(y, m-1-i, 1);
     const yi = dt.getFullYear(), mi = dt.getMonth()+1;
     labels6.push(MESES_SHORT[mi-1]);
-    const ai = DB.get('atendimentos').filter(a => { const d=new Date(a.data); return d.getFullYear()===yi && d.getMonth()+1===mi; });
+    const ai = DB.get('atendimentos').filter(a => { const d=U.parseISODate(a.data); return d && d.getFullYear()===yi && d.getMonth()+1===mi; });
     const ri = ai.reduce((s,a) => s+U.calcRepasse(a),0) + getSublocacaoRevenue(yi, mi);
-    const di = DB.get('despesas').filter(d => { const dt2=new Date(d.data); return dt2.getFullYear()===yi && dt2.getMonth()+1===mi; }).reduce((s,d) => s+(d.valor||0),0);
+    const di = DB.get('despesas').filter(d => { const dt2=U.parseISODate(d.data); return dt2 && dt2.getFullYear()===yi && dt2.getMonth()+1===mi; }).reduce((s,d) => s+(d.valor||0),0);
     dataRec6.push(ri); dataDsp6.push(di);
   }
 
@@ -734,6 +856,15 @@ window.saveProf = () => {
   if (!nome) { toast('Nome é obrigatório','error'); return; }
   const regime = g('f-regime')?.value || '';
   if (!regime) { toast('Regime é obrigatório','error'); return; }
+  const prev = id ? DB.getOne('profissionais', id) : null;
+  const novoAtivo = g('f-ativo')?.checked !== false;
+  // Marca a data de desativação automaticamente (para não afetar receita de meses passados
+  // quando o profissional for reativado/desativado depois). Some novamente se reativado.
+  let dataInativacao = prev?.dataInativacao || '';
+  if (prev) {
+    if (prev.ativo && !novoAtivo) dataInativacao = U.isoToday();
+    else if (!prev.ativo && novoAtivo) dataInativacao = '';
+  }
   const base = {
     id: id || U.id(),
     nome,
@@ -751,7 +882,8 @@ window.saveProf = () => {
     diaVencimento: parseInt(g('f-diaVencimento')?.value) || 5,
     usaEstacionamento: g('f-usaEstac')?.checked || false,
     valorEstacionamento: U.parseNum(g('f-valorEstac')?.value || '0'),
-    ativo: g('f-ativo')?.checked !== false,
+    ativo: novoAtivo,
+    dataInativacao,
     obs: g('f-obs')?.value?.trim() || '',
     createdAt: (id && (DB.getOne('profissionais', id) || {}).createdAt) ? DB.getOne('profissionais', id).createdAt : new Date().toISOString()
   };
@@ -895,14 +1027,13 @@ window.delPac = (id) => {
 
 /* ===== ATENDIMENTOS ===== */
 function renderAtendimentos() {
-  const now = new Date();
-  let y = now.getFullYear(), m = now.getMonth()+1;
-  let filterProf = '';
+  const state = PageState.atendimentos;
 
   function draw() {
+    const { y, m, filterProf } = state;
     const list = DB.get('atendimentos').filter(a => {
-      const d = new Date(a.data);
-      return d.getFullYear()===y && d.getMonth()+1===m && (!filterProf || a.profissionalId===filterProf);
+      const d = U.parseISODate(a.data);
+      return d && d.getFullYear()===y && d.getMonth()+1===m && (!filterProf || a.profissionalId===filterProf);
     }).sort((a,b)=>b.data.localeCompare(a.data));
 
     const totalVal = list.reduce((s,a)=>s+(a.valor||0),0);
@@ -942,19 +1073,27 @@ function renderAtendimentos() {
     <div class="filters-bar">
       <div class="month-nav">
         <button onclick="atNavMes(-1)">‹</button>
-        <div class="month-label" id="at-month-label"></div>
+        <div class="month-label-wrap">
+          <div class="month-label" id="at-month-label"></div>
+          <input type="date" class="month-label-input" id="at-month-input">
+        </div>
         <button onclick="atNavMes(1)">›</button>
       </div>
       <select class="filter-select" id="at-prof-filter">
         <option value="">Todos os profissionais</option>
-        ${profs.map(p=>`<option value="${p.id}">${U.escHtml(p.nome)}</option>`).join('')}
+        ${profs.map(p=>`<option value="${p.id}" ${state.filterProf===p.id?'selected':''}>${U.escHtml(p.nome)}</option>`).join('')}
       </select>
     </div>
     <div id="at-list"></div>`;
 
-  window.atNavMes = (d) => { m+=d; if(m>12){m=1;y++;}if(m<1){m=12;y--;} document.getElementById('at-month-label').textContent=`${MESES[m-1]} ${y}`; draw(); };
-  document.getElementById('at-prof-filter').onchange = e => { filterProf=e.target.value; draw(); };
-  document.getElementById('at-month-label').textContent = `${MESES[m-1]} ${y}`;
+  window.atNavMes = (d) => {
+    state.m+=d; if(state.m>12){state.m=1;state.y++;} if(state.m<1){state.m=12;state.y--;}
+    wireMonthPicker('at', state, draw);
+    draw();
+  };
+  document.getElementById('at-prof-filter').value = state.filterProf;
+  document.getElementById('at-prof-filter').onchange = e => { state.filterProf=e.target.value; draw(); };
+  wireMonthPicker('at', state, draw);
   draw();
 }
 
@@ -1049,7 +1188,7 @@ function renderCobranca() {
   }
 
   function autoCalc(p) {
-    const atends = DB.get('atendimentos').filter(a=>{ const d=new Date(a.data); return a.profissionalId===p.id && d.getFullYear()===y && d.getMonth()+1===m; });
+    const atends = DB.get('atendimentos').filter(a=>{ const d=U.parseISODate(a.data); return a.profissionalId===p.id && d && d.getFullYear()===y && d.getMonth()+1===m; });
     const c = calcCobranca(p);
     if (['sublocacao','turno'].includes(p.regime)) {
       const base = p.regime==='sublocacao' ? (p.valorMensal||0) : (p.valorTurno||0);
@@ -1201,20 +1340,15 @@ function renderCobranca() {
 
 /* ===== DESPESAS ===== */
 function renderDespesas() {
-  const now = new Date();
-  let y = now.getFullYear(), m = now.getMonth()+1;
-  let filterCat = '';
+  const state = PageState.despesas;
 
   function draw() {
+    const { y, m, filterCat } = state;
     const list = DB.get('despesas').filter(d => {
-      const dt = new Date(d.data);
-      return dt.getFullYear()===y && dt.getMonth()+1===m && (!filterCat || d.categoria===filterCat);
+      const dt = U.parseISODate(d.data);
+      return dt && dt.getFullYear()===y && dt.getMonth()+1===m && (!filterCat || d.categoria===filterCat);
     }).sort((a,b)=>b.data.localeCompare(a.data));
     const total = list.reduce((s,d)=>s+(d.valor||0),0);
-
-    // Group by category
-    const groups = {};
-    list.forEach(d => { if(!groups[d.categoria]) groups[d.categoria]=[]; groups[d.categoria].push(d); });
 
     document.getElementById('desp-list').innerHTML = `
       <div class="stat-row">
@@ -1222,20 +1356,21 @@ function renderDespesas() {
         <div class="stat-chip">Registros: <strong>${list.length}</strong></div>
       </div>
       ${list.length ? `<div class="table-wrap"><table>
-        <thead><tr><th>Data</th><th>Categoria</th><th>Descrição</th><th style="text-align:right">Valor</th><th style="text-align:right">Ações</th></tr></thead>
-        <tbody>${list.map(d=>`
+        <thead><tr><th>Data</th><th>Categoria</th><th>Subcategoria</th><th style="text-align:right">Valor</th><th style="text-align:right">Ações</th></tr></thead>
+        <tbody>${list.map(d=>{
+          const subcatLabel = getAllSubcats().find(s=>s.k===d.subcategoria)?.l || d.subcategoria || '—';
+          return `
           <tr>
             <td>${U.date(d.data)}</td>
             <td><span class="badge badge-gray" style="font-size:11px">${U.escHtml(CATS_DESPESA[d.categoria]||d.categoria)}</span></td>
-            <td>${U.escHtml(d.descricao||d.subcategoria)}</td>
+            <td>${U.escHtml(subcatLabel)}${d.descricao?`<div style="font-size:11px;color:var(--text-muted)">${U.escHtml(d.descricao)}</div>`:''}</td>
             <td style="text-align:right;font-weight:600;color:var(--danger)">${U.fmt(d.valor)}</td>
             <td><div class="td-actions"><button class="action-btn edit" onclick='editDesp("${d.id}")'>✏️</button><button class="action-btn delete" onclick='delDesp("${d.id}")'>🗑</button></div></td>
-          </tr>`).join('')}
+          </tr>`;}).join('')}
           <tr style="background:var(--surface-2)"><td colspan="3" style="font-weight:700;padding:10px 14px">TOTAL</td><td style="text-align:right;font-weight:800;color:var(--danger);padding:10px 14px">${U.fmt(total)}</td><td></td></tr>
         </tbody></table></div>` : '<div class="empty-state"><div class="empty-icon">📉</div><h3>Nenhuma despesa registrada</h3></div>'}`;
   }
 
-  const catGroups = ['2','3','4'];
   document.getElementById('content').innerHTML = `
     <div class="page-header"><h2>Despesas</h2>
       <div class="page-actions">
@@ -1246,7 +1381,10 @@ function renderDespesas() {
     <div class="filters-bar">
       <div class="month-nav">
         <button onclick="despNavMes(-1)">‹</button>
-        <div class="month-label" id="desp-month-label"></div>
+        <div class="month-label-wrap">
+          <div class="month-label" id="desp-month-label"></div>
+          <input type="date" class="month-label-input" id="desp-month-input">
+        </div>
         <button onclick="despNavMes(1)">›</button>
       </div>
       <select class="filter-select" id="desp-cat-filter">
@@ -1258,9 +1396,14 @@ function renderDespesas() {
     </div>
     <div id="desp-list"></div>`;
 
-  window.despNavMes = (d) => { m+=d; if(m>12){m=1;y++;}if(m<1){m=12;y--;} document.getElementById('desp-month-label').textContent=`${MESES[m-1]} ${y}`; draw(); };
-  document.getElementById('desp-cat-filter').onchange = e => { filterCat=e.target.value; draw(); };
-  document.getElementById('desp-month-label').textContent = `${MESES[m-1]} ${y}`;
+  window.despNavMes = (d) => {
+    state.m+=d; if(state.m>12){state.m=1;state.y++;} if(state.m<1){state.m=12;state.y--;}
+    wireMonthPicker('desp', state, draw);
+    draw();
+  };
+  document.getElementById('desp-cat-filter').value = state.filterCat;
+  document.getElementById('desp-cat-filter').onchange = e => { state.filterCat=e.target.value; draw(); };
+  wireMonthPicker('desp', state, draw);
   draw();
 }
 
@@ -1432,15 +1575,38 @@ window.gerenciarCategoriasReceita = () => {
 
 /* ===== RECEITAS ===== */
 function renderReceitas() {
-  const now = new Date();
-  let y = now.getFullYear(), m = now.getMonth()+1;
+  const state = PageState.receitas;
 
   function draw() {
+    const { y, m } = state;
+    const c = calcMonth(y, m);
     const list = getReceitasMonth(y, m).sort((a,b)=>b.data.localeCompare(a.data));
     const total = list.reduce((s,r)=>s+(r.valor||0),0);
+    const outrasManuais = c.rOutras - c.saldoBancoAnterior;
+
+    const resumoRows = [
+      ['Saldo Anterior — Banco (transportado do mês anterior)', c.saldoBancoAnterior],
+      ['Aluguel de Salas (Sublocação/Turno)', c.rSubl],
+      ['Porcentagem sobre Consultas', c.rPorcentagem],
+      ['Repasse por Cliente (Fixo)', c.rCliente],
+      ['Repasse por Hora', c.rHora],
+      ['Outras Receitas (lançamentos manuais)', outrasManuais]
+    ].filter(([,v]) => v);
+
+    document.getElementById('rec-resumo').innerHTML = `
+      <div class="table-wrap"><table>
+        <thead><tr><th>Origem</th><th style="text-align:right">Valor</th></tr></thead>
+        <tbody>
+          ${resumoRows.length ? resumoRows.map(([label,valor])=>`
+          <tr><td>${U.escHtml(label)}</td><td style="text-align:right;font-weight:600;color:var(--success)">${U.fmt(valor)}</td></tr>`).join('')
+          : '<tr><td colspan="2" style="color:var(--text-muted)">Nenhuma receita neste mês</td></tr>'}
+          <tr style="background:var(--surface-2)"><td style="font-weight:800;padding:10px 14px">TOTAL DE RECEITAS DO MÊS</td><td style="text-align:right;font-weight:800;color:var(--success);padding:10px 14px">${U.fmt(c.totalReceita)}</td></tr>
+        </tbody>
+      </table></div>`;
+
     document.getElementById('rec-list').innerHTML = `
       <div class="stat-row">
-        <div class="stat-chip">Total outras receitas: <strong style="color:var(--success)">${U.fmt(total)}</strong></div>
+        <div class="stat-chip">Total lançamentos manuais: <strong style="color:var(--success)">${U.fmt(total)}</strong></div>
         <div class="stat-chip">Registros: <strong>${list.length}</strong></div>
       </div>
       ${list.length ? `<div class="table-wrap"><table>
@@ -1455,7 +1621,7 @@ function renderReceitas() {
             <td><div class="td-actions"><button class="action-btn edit" onclick='editReceita("${r.id}")'>✏️</button><button class="action-btn delete" onclick='delReceita("${r.id}")'>🗑</button></div></td>
           </tr>`).join('')}
           <tr style="background:var(--surface-2)"><td colspan="4" style="font-weight:700;padding:10px 14px">TOTAL</td><td style="text-align:right;font-weight:800;color:var(--success);padding:10px 14px">${U.fmt(total)}</td><td></td></tr>
-        </tbody></table></div>` : '<div class="empty-state"><div class="empty-icon">💵</div><h3>Nenhuma receita registrada neste mês</h3><p>Registre entradas como aluguel de auditório, garagens, saldo anterior etc.</p></div>'}`;
+        </tbody></table></div>` : '<div class="empty-state"><div class="empty-icon">💵</div><h3>Nenhum lançamento manual neste mês</h3><p>Registre entradas como aluguel de auditório, garagens, saldo anterior etc.</p></div>'}`;
   }
 
   document.getElementById('content').innerHTML = `
@@ -1468,14 +1634,24 @@ function renderReceitas() {
     <div class="filters-bar">
       <div class="month-nav">
         <button onclick="recNavMes(-1)">‹</button>
-        <div class="month-label" id="rec-month-label"></div>
+        <div class="month-label-wrap">
+          <div class="month-label" id="rec-month-label"></div>
+          <input type="date" class="month-label-input" id="rec-month-input">
+        </div>
         <button onclick="recNavMes(1)">›</button>
       </div>
     </div>
+    <div class="card-title" style="margin-top:4px">Resumo de Receitas do Mês <span>Todas as origens</span></div>
+    <div id="rec-resumo" style="margin-bottom:20px"></div>
+    <div class="card-title">Lançamentos Manuais <span>Editáveis</span></div>
     <div id="rec-list"></div>`;
 
-  window.recNavMes = (d) => { m+=d; if(m>12){m=1;y++;}if(m<1){m=12;y--;} document.getElementById('rec-month-label').textContent=`${MESES[m-1]} ${y}`; draw(); };
-  document.getElementById('rec-month-label').textContent = `${MESES[m-1]} ${y}`;
+  window.recNavMes = (d) => {
+    state.m+=d; if(state.m>12){state.m=1;state.y++;} if(state.m<1){state.m=12;state.y--;}
+    wireMonthPicker('rec', state, draw);
+    draw();
+  };
+  wireMonthPicker('rec', state, draw);
   draw();
 }
 
@@ -1520,44 +1696,19 @@ window.delReceita = (id) => Modal.confirm('Excluir esta receita?', () => { DB.re
 
 /* ===== BALANCETE ===== */
 function renderBalancete() {
-  const now = new Date();
-  let viewYear = now.getFullYear();
-  let viewType = 'mensal';
-  let viewMonth = now.getMonth()+1;
-
-  function calcMonth(yr, mo) {
-    const atends = DB.get('atendimentos').filter(a=>{ const d=new Date(a.data); return d.getFullYear()===yr&&d.getMonth()+1===mo; });
-    const desps = DB.get('despesas').filter(d=>{ const dt=new Date(d.data); return dt.getFullYear()===yr&&dt.getMonth()+1===mo; });
-
-    let rSubl=0, rPorcentagem=0, rCliente=0, rHora=0, rOutras=0;
-    rSubl = getSublocacaoRevenue(yr, mo);
-    atends.forEach(a => {
-      const p = DB.getOne('profissionais', a.profissionalId);
-      if (!p) return;
-      const rep = U.calcRepasse(a);
-      if (p.regime==='porcentagem') rPorcentagem += rep;
-      else if (p.regime==='cliente') rCliente += rep;
-      else if (p.regime==='hora') rHora += rep;
-    });
-    rOutras = getReceitasMonth(yr, mo).reduce((s,r)=>s+(r.valor||0),0);
-    const totalReceita = rSubl + rPorcentagem + rCliente + rHora + rOutras;
-
-    const dPessoal = desps.filter(d=>d.categoria==='2').reduce((s,d)=>s+(d.valor||0),0);
-    const dFixas = desps.filter(d=>d.categoria==='3').reduce((s,d)=>s+(d.valor||0),0);
-    const dVariaveis = desps.filter(d=>d.categoria==='4').reduce((s,d)=>s+(d.valor||0),0);
-    const totalDespesa = dPessoal + dFixas + dVariaveis;
-    return { rSubl, rPorcentagem, rCliente, rHora, rOutras, totalReceita, dPessoal, dFixas, dVariaveis, totalDespesa, resultado:totalReceita-totalDespesa };
-  }
+  const state = PageState.balancete;
+  const calcCache = {}; // memoiza resultado por mês durante esta renderização (evita recomputar a cadeia do saldo anterior)
 
   function drawMensal() {
-    const c = calcMonth(viewYear, viewMonth);
+    const { y: viewYear, m: viewMonth } = state;
+    const c = calcMonth(viewYear, viewMonth, calcCache);
     const recExtras = getReceitasMonth(viewYear, viewMonth);
     const recBycat = {};
     getAllRecCats().forEach(cat => { recBycat[cat.k] = recExtras.filter(r=>r.categoria===cat.k).reduce((s,r)=>s+(r.valor||0),0); });
     const customRecCats = DB.get('custom_rec_cats');
     const rows = [
       ['1 — RECEITAS', null, true],
-      ['1.1 Saldo Anterior — Banco', recBycat['saldo_banco']||0],
+      ['1.1 Saldo Anterior — Banco (mês anterior)', c.saldoBancoAnterior],
       ['1.2 Saldo Anterior — Caixa', recBycat['saldo_caixa']||0],
       ['1.3 Saldo Anterior — Aplicações', recBycat['saldo_aplic']||0],
       ['1.4 Aluguel de Salas (Sublocação)', c.rSubl],
@@ -1572,21 +1723,21 @@ function renderBalancete() {
       ['', null],
       ['2 — DESPESAS COM PESSOAL', null, true],
       ...getAllSubcats().filter(s=>s.g==='2').map(s=>{
-        const v = DB.get('despesas').filter(d=>{ const dt=new Date(d.data); return dt.getFullYear()===viewYear&&dt.getMonth()+1===viewMonth&&d.subcategoria===s.k; }).reduce((sum,d)=>sum+(d.valor||0),0);
+        const v = DB.get('despesas').filter(d=>{ const dt=U.parseISODate(d.data); return dt && dt.getFullYear()===viewYear&&dt.getMonth()+1===viewMonth&&d.subcategoria===s.k; }).reduce((sum,d)=>sum+(d.valor||0),0);
         return [s.l, v];
       }),
       ['Subtotal Pessoal', c.dPessoal, false, null, true],
       ['', null],
       ['3 — DESPESAS FIXAS', null, true],
       ...getAllSubcats().filter(s=>s.g==='3').map(s=>{
-        const v = DB.get('despesas').filter(d=>{ const dt=new Date(d.data); return dt.getFullYear()===viewYear&&dt.getMonth()+1===viewMonth&&d.subcategoria===s.k; }).reduce((sum,d)=>sum+(d.valor||0),0);
+        const v = DB.get('despesas').filter(d=>{ const dt=U.parseISODate(d.data); return dt && dt.getFullYear()===viewYear&&dt.getMonth()+1===viewMonth&&d.subcategoria===s.k; }).reduce((sum,d)=>sum+(d.valor||0),0);
         return [s.l, v];
       }),
       ['Subtotal Fixas', c.dFixas, false, null, true],
       ['', null],
       ['4 — DESPESAS VARIÁVEIS', null, true],
       ...getAllSubcats().filter(s=>s.g==='4').map(s=>{
-        const v = DB.get('despesas').filter(d=>{ const dt=new Date(d.data); return dt.getFullYear()===viewYear&&dt.getMonth()+1===viewMonth&&d.subcategoria===s.k; }).reduce((sum,d)=>sum+(d.valor||0),0);
+        const v = DB.get('despesas').filter(d=>{ const dt=U.parseISODate(d.data); return dt && dt.getFullYear()===viewYear&&dt.getMonth()+1===viewMonth&&d.subcategoria===s.k; }).reduce((sum,d)=>sum+(d.valor||0),0);
         return [s.l, v];
       }),
       ['Subtotal Variáveis', c.dVariaveis, false, null, true],
@@ -1616,8 +1767,9 @@ function renderBalancete() {
   }
 
   function drawAnual() {
+    const { y: viewYear } = state;
     const months = Array.from({length:12},(_,i)=>i+1);
-    const data = months.map(mo=>calcMonth(viewYear, mo));
+    const data = months.map(mo=>calcMonth(viewYear, mo, calcCache));
     document.getElementById('balancete-content').innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <h3>Resumo Anual — ${viewYear}</h3>
@@ -1642,7 +1794,7 @@ function renderBalancete() {
       </table></div>`;
   }
 
-  function draw() { viewType==='mensal' ? drawMensal() : drawAnual(); }
+  function draw() { state.viewType==='mensal' ? drawMensal() : drawAnual(); }
 
   document.getElementById('content').innerHTML = `
     <div class="page-header"><h2>Balancete</h2></div>
@@ -1654,7 +1806,10 @@ function renderBalancete() {
         </div>
         <div class="month-nav" id="bal-month-nav">
           <button onclick="balNavMes(-1)">‹</button>
-          <div class="month-label" id="bal-month-label"></div>
+          <div class="month-label-wrap">
+            <div class="month-label" id="bal-month-label"></div>
+            <input type="date" class="month-label-input" id="bal-month-input">
+          </div>
           <button onclick="balNavMes(1)">›</button>
         </div>
         <div class="month-nav" id="bal-year-nav" style="display:none">
@@ -1667,17 +1822,25 @@ function renderBalancete() {
     <div id="balancete-content" class="card"></div>`;
 
   window.balSetView = (t) => {
-    viewType=t;
+    state.viewType=t;
     document.getElementById('tab-mensal').classList.toggle('active', t==='mensal');
     document.getElementById('tab-anual').classList.toggle('active', t==='anual');
     document.getElementById('bal-month-nav').style.display = t==='mensal' ? 'flex' : 'none';
     document.getElementById('bal-year-nav').style.display = t==='anual' ? 'flex' : 'none';
     draw();
   };
-  window.balNavMes = (d) => { viewMonth+=d; if(viewMonth>12){viewMonth=1;viewYear++;}if(viewMonth<1){viewMonth=12;viewYear--;} document.getElementById('bal-month-label').textContent=`${MESES[viewMonth-1]} ${viewYear}`; draw(); };
-  window.balNavAno = (d) => { viewYear+=d; document.getElementById('bal-year-label').textContent=String(viewYear); draw(); };
-  document.getElementById('bal-month-label').textContent = `${MESES[viewMonth-1]} ${viewYear}`;
-  document.getElementById('bal-year-label').textContent = String(viewYear);
+  window.balNavMes = (d) => {
+    state.m+=d; if(state.m>12){state.m=1;state.y++;} if(state.m<1){state.m=12;state.y--;}
+    wireMonthPicker('bal', state, draw);
+    draw();
+  };
+  window.balNavAno = (d) => { state.y+=d; document.getElementById('bal-year-label').textContent=String(state.y); wireMonthPicker('bal', state, draw); draw(); };
+  wireMonthPicker('bal', state, draw);
+  document.getElementById('bal-year-label').textContent = String(state.y);
+  document.getElementById('tab-mensal').classList.toggle('active', state.viewType==='mensal');
+  document.getElementById('tab-anual').classList.toggle('active', state.viewType==='anual');
+  document.getElementById('bal-month-nav').style.display = state.viewType==='mensal' ? 'flex' : 'none';
+  document.getElementById('bal-year-nav').style.display = state.viewType==='anual' ? 'flex' : 'none';
   draw();
 }
 
