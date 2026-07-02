@@ -293,6 +293,8 @@ tbody tr:hover td { background: var(--surface-2); }
 .action-btn.view:hover { background: var(--primary); color: #fff; }
 .action-btn.pay { background: var(--success-light); color: var(--success); }
 .action-btn.pay:hover { background: var(--success); color: #fff; }
+.action-btn.warning { background: var(--warning-light); color: var(--warning); }
+.action-btn.warning:hover { background: var(--warning); color: #fff; }
 
 /* ===== BADGES ===== */
 .badge {

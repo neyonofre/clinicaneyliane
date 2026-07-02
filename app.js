@@ -249,6 +249,15 @@ function getReceitasMonth(yr, mo) {
   return DB.get('receitas').filter(r => { const d=U.parseISODate(r.data); return d && d.getFullYear()===yr && d.getMonth()+1===mo; });
 }
 
+// Um profissional só deve ser cobrado a partir do mês em que foi cadastrado (dataContrato).
+// Evita gerar cobrança retroativa para meses anteriores ao seu cadastro no sistema.
+function contratoIniciadoNoMes(p, yr, mo) {
+  if (!p.dataContrato) return true;
+  const start = U.parseISODate(p.dataContrato);
+  const monthEnd = new Date(yr, mo, 0);
+  return !start || start <= monthEnd;
+}
+
 // Calcula a cobrança (valor esperado) de um profissional num mês: base de sublocação/turno
 // (+ estacionamento + horas extras) ou o repasse somado dos atendimentos daquele mês.
 // Se houver um valor editado manualmente (valorOverride) na cobrança salva, ele prevalece.
@@ -401,7 +410,10 @@ function renderDashboard() {
   const y = now.getFullYear(), m = now.getMonth()+1;
   const atends = DB.get('atendimentos').filter(a => { const d=U.parseISODate(a.data); return d && d.getFullYear()===y && d.getMonth()+1===m; });
   const desps = DB.get('despesas').filter(d => { const dt=U.parseISODate(d.data); return dt && dt.getFullYear()===y && dt.getMonth()+1===m; });
-  const cobrs = DB.get('cobrancas').filter(c => c.ano===y && c.mes===m);
+  // Só considera cobranças de profissionais atualmente ativos (e já contratados no mês) —
+  // um profissional inativado não deve gerar/continuar contando cobrança pendente.
+  const profsCobraveis = new Set(DB.get('profissionais').filter(p => p.ativo && contratoIniciadoNoMes(p, y, m)).map(p => p.id));
+  const cobrs = DB.get('cobrancas').filter(c => c.ano===y && c.mes===m && profsCobraveis.has(c.profissionalId));
 
   const receitasMes = calcReceitasMes(y, m);
   let totalReceita = receitasMes.totalReceita;
@@ -642,6 +654,9 @@ function renderProfissionais() {
             <td><div class="td-actions">
               <button class="action-btn view" onclick='viewProf("${p.id}")'>👁</button>
               <button class="action-btn edit" onclick='editProf("${p.id}")'>✏️</button>
+              ${p.ativo
+                ? `<button class="action-btn warning" onclick='toggleAtivoProf("${p.id}")' title="Inativar">⛔</button>`
+                : `<button class="action-btn pay" onclick='toggleAtivoProf("${p.id}")' title="Reativar">↩️</button>`}
               <button class="action-btn delete" onclick='delProf("${p.id}")'>🗑</button>
             </div></td>
           </tr>`).join('')}
@@ -913,6 +928,22 @@ window.delProf = (id) => {
   });
 };
 
+window.toggleAtivoProf = (id) => {
+  const p = DB.getOne('profissionais', id);
+  if (!p) return;
+  if (p.ativo) {
+    Modal.confirm(`Inativar <strong>${U.escHtml(p.nome)}</strong>? Ele deixará de aparecer na Cobrança dos próximos meses, mas o histórico é mantido e ele pode ser reativado depois.`, () => {
+      DB.save('profissionais', { ...p, ativo:false });
+      toast('Profissional inativado', 'warning');
+      renderProfissionais();
+    });
+  } else {
+    DB.save('profissionais', { ...p, ativo:true });
+    toast('Profissional reativado', 'success');
+    renderProfissionais();
+  }
+};
+
 /* ===== PACIENTES ===== */
 function renderPacientes() {
   let filter = '';
@@ -1172,7 +1203,7 @@ function renderCobranca() {
   let y = now.getFullYear(), m = now.getMonth()+1;
 
   function draw() {
-    const profs = DB.get('profissionais').filter(p=>p.ativo);
+    const profs = DB.get('profissionais').filter(p=>p.ativo && contratoIniciadoNoMes(p, y, m));
     const cobrs = profs.map(p=>({prof:p, calc:getCobranca(p, y, m)}));
     const totalPend = cobrs.filter(x=>!x.calc.boletoPago).reduce((s,x)=>s+(x.calc.totalPagar||0),0);
     const totalPago = cobrs.filter(x=>x.calc.boletoPago).reduce((s,x)=>s+(x.calc.totalPagar||0),0);
