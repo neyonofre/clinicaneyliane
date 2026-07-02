@@ -97,12 +97,22 @@ function currentUser() { return Session.email || 'Operador local'; }
 /* ===== DATABASE ===== */
 const DB_TABLES = ['profissionais','pacientes','atendimentos','despesas','cobrancas','cobrancas_excluidas','receitas','custom_subcats','custom_rec_cats'];
 
+// pacientes e atendimentos vivem em coleções Firestore reais (1 documento por registro),
+// compartilhadas com o Prontuário — em vez do padrão antigo de "array dentro de 1 doc"
+// usado pelas demais tabelas. Isso permite escrita concorrente das duas aplicações
+// sem uma sobrescrever a mudança da outra.
+const SHARED_COLLECTIONS = ['pacientes', 'atendimentos'];
+
 const DB = {
   _cache: {},
   _fs: null,
   _useFirebase: false,
+  _unsubscribers: [],
+
+  _isShared(t) { return SHARED_COLLECTIONS.includes(t); },
 
   _write(t) {
+    if (this._isShared(t) && this._useFirebase) return; // já gravado por documento em save()/remove()
     if (this._useFirebase && this._fs) {
       this._fs.collection('clinica').doc(t).set({ items: this._cache[t] || [] })
         .catch(e => console.warn('Firebase write [' + t + ']:', e));
@@ -115,12 +125,30 @@ const DB = {
   set(t, d) { this._cache[t] = d; this._write(t); },
   getOne(t, id) { return (this._cache[t] || []).find(x => x.id === id) || null; },
   save(t, item) {
+    if (this._isShared(t) && this._useFirebase && this._fs) {
+      if (!item.id) item.id = U.id();
+      this._fs.collection(t).doc(item.id).set(item)
+        .catch(e => console.warn('Firebase write [' + t + ']:', e));
+      const list = [...(this._cache[t] || [])];
+      const idx = list.findIndex(x => x.id === item.id);
+      if (idx >= 0) list[idx] = item; else list.push(item);
+      this._cache[t] = list; // atualização otimista; o listener confirma em seguida
+      return;
+    }
     const list = [...(this._cache[t] || [])];
     const idx = list.findIndex(x => x.id === item.id);
     if (idx >= 0) list[idx] = item; else list.push(item);
     this.set(t, list);
   },
-  remove(t, id) { this.set(t, (this._cache[t] || []).filter(x => x.id !== id)); },
+  remove(t, id) {
+    if (this._isShared(t) && this._useFirebase && this._fs) {
+      this._fs.collection(t).doc(id).delete()
+        .catch(e => console.warn('Firebase delete [' + t + ']:', e));
+      this._cache[t] = (this._cache[t] || []).filter(x => x.id !== id);
+      return;
+    }
+    this.set(t, (this._cache[t] || []).filter(x => x.id !== id));
+  },
   getConfig() { return JSON.parse(localStorage.getItem('clinica_config') || '{}'); },
   setConfig(d) { localStorage.setItem('clinica_config', JSON.stringify(d)); },
 
@@ -128,14 +156,20 @@ const DB = {
     if (this._useFirebase && this._fs) {
       await Promise.all(DB_TABLES.map(async t => {
         try {
-          const snap = await this._fs.collection('clinica').doc(t).get();
-          this._cache[t] = snap.exists ? (snap.data().items || []) : [];
+          if (this._isShared(t)) {
+            const snap = await this._fs.collection(t).get();
+            this._cache[t] = snap.docs.map(d => d.data());
+          } else {
+            const snap = await this._fs.collection('clinica').doc(t).get();
+            this._cache[t] = snap.exists ? (snap.data().items || []) : [];
+          }
         } catch(e) { this._cache[t] = []; }
       }));
       if (!this._cache['profissionais'].length) {
         this._cache['profissionais'] = INITIAL_PROFISSIONAIS;
         this._write('profissionais');
       }
+      this._watchShared();
     } else {
       if (!localStorage.getItem('clinica_initialized')) {
         this._cache['profissionais'] = INITIAL_PROFISSIONAIS;
@@ -148,6 +182,20 @@ const DB = {
         });
       }
     }
+  },
+
+  // Escuta mudanças ao vivo em pacientes/atendimentos (ex: feitas pelo Prontuário)
+  // e re-renderiza a página atual pra refletir sem precisar recarregar.
+  _watchShared() {
+    SHARED_COLLECTIONS.forEach(t => {
+      const unsub = this._fs.collection(t).onSnapshot(snap => {
+        this._cache[t] = snap.docs.map(d => d.data());
+        if (typeof Router !== 'undefined' && Router.current && Router.pages[Router.current]) {
+          Router.pages[Router.current].render();
+        }
+      }, e => console.warn('Listener [' + t + ']:', e));
+      this._unsubscribers.push(unsub);
+    });
   }
 };
 
