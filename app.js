@@ -201,9 +201,9 @@ const U = {
 function toast(msg, type='info') {
   const c = document.getElementById('toast-container');
   const t = document.createElement('div');
-  const icons = { success:'✅', error:'❌', warning:'⚠️', info:'ℹ️' };
+  const icons = { success:'<span class="msi">check_circle</span>', error:'<span class="msi">error</span>', warning:'<span class="msi">warning</span>', info:'<span class="msi">info</span>' };
   t.className = `toast toast-${type}`;
-  t.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  t.innerHTML = `<span>${icons[type]||'<span class="msi">info</span>'}</span><span>${msg}</span>`;
   c.appendChild(t);
   setTimeout(() => t.remove(), 3500);
 }
@@ -487,8 +487,8 @@ function renderDashboard() {
               const ps = occGrid[s][d][t];
               const isOccupied = ps.length > 0;
               const title = isOccupied ? t + '\\n' + ps.map(p=>p.nome).join('\\n') : t + ' - Livre';
-              const bg = ps.length > 1 ? '#a855f7' : isOccupied ? 'var(--danger)' : 'rgba(34,197,94,0.15)';
-              const bcol = ps.length > 1 ? '#a855f7' : isOccupied ? 'var(--danger)' : 'rgba(34,197,94,0.4)';
+              const bg = ps.length > 1 ? '#8a5a7a' : isOccupied ? 'var(--danger)' : 'rgba(111,143,91,0.15)';
+              const bcol = ps.length > 1 ? '#8a5a7a' : isOccupied ? 'var(--danger)' : 'rgba(111,143,91,0.4)';
               const col = isOccupied ? '#fff' : 'var(--text-muted)';
               return `<span title="${U.escHtml(title)}" style="display:inline-block;width:22px;height:22px;line-height:20px;text-align:center;border-radius:4px;background:${bg};color:${col};border:1px solid ${bcol};font-size:10px;font-weight:bold;cursor:help">${t[0]}</span>`;
             }).join('<span style="width:4px;display:inline-block"></span>');
@@ -498,15 +498,15 @@ function renderDashboard() {
       </table>
     </div>
     <div style="margin-top:12px;display:flex;gap:16px;font-size:11px;color:var(--text-muted);justify-content:center">
-      <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:2px;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.4)"></span> Livre</span>
+      <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:2px;background:rgba(111,143,91,0.15);border:1px solid rgba(111,143,91,0.4)"></span> Livre</span>
       <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:2px;background:var(--danger)"></span> Ocupado</span>
-      <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:2px;background:#a855f7"></span> Conflito (+1 prof.)</span>
+      <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:2px;background:#8a5a7a"></span> Conflito (+1 prof.)</span>
     </div>`;
 
   content.innerHTML = `
     <div class="kpi-grid">
       <div class="kpi-card">
-        <div class="kpi-icon" style="background:var(--success-light)">💰</div>
+        <div class="kpi-icon" style="background:var(--success-light);color:var(--success)"><span class="msi">savings</span></div>
         <div class="kpi-info">
           <div class="kpi-label">Receita ${MESES_SHORT[m-1]}</div>
           <div class="kpi-value">${U.fmtShort(totalReceita)}</div>
@@ -514,7 +514,7 @@ function renderDashboard() {
         </div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-icon" style="background:var(--danger-light)">📉</div>
+        <div class="kpi-icon" style="background:var(--danger-light);color:var(--danger)"><span class="msi">trending_down</span></div>
         <div class="kpi-info">
           <div class="kpi-label">Despesas ${MESES_SHORT[m-1]}</div>
           <div class="kpi-value">${U.fmtShort(totalDespesa)}</div>
@@ -522,7 +522,7 @@ function renderDashboard() {
         </div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-icon" style="background:${resultado>=0?'var(--success-light)':'var(--danger-light)'}">📊</div>
+        <div class="kpi-icon" style="background:${resultado>=0?'var(--success-light)':'var(--danger-light)'};color:${resultado>=0?'var(--success)':'var(--danger)'}"><span class="msi">monitoring</span></div>
         <div class="kpi-info">
           <div class="kpi-label">Resultado ${MESES_SHORT[m-1]}</div>
           <div class="kpi-value" style="color:${resultado>=0?'var(--success)':'var(--danger)'}">${U.fmtShort(resultado)}</div>
@@ -530,7 +530,7 @@ function renderDashboard() {
         </div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-icon" style="background:var(--info-light)">📋</div>
+        <div class="kpi-icon" style="background:var(--info-light);color:var(--info)"><span class="msi">assignment</span></div>
         <div class="kpi-info">
           <div class="kpi-label">Atendimentos</div>
           <div class="kpi-value">${atends.length}</div>
@@ -554,10 +554,10 @@ function renderDashboard() {
       <div class="card-title">Ocupação da Clínica <span>Por dia e turno — profissionais agendados</span></div>
       <div style="overflow-x:auto">${occHtml}</div>
       <div style="display:flex;gap:16px;margin-top:10px;font-size:11.5px;color:var(--text-muted);flex-wrap:wrap">
-        <span>⬜ Livre</span>
-        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:14px;height:14px;background:rgba(34,197,94,0.18);border-radius:3px"></span>1–2 profissionais</span>
-        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:14px;height:14px;background:rgba(34,197,94,0.4);border-radius:3px"></span>3–4 profissionais</span>
-        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:14px;height:14px;background:rgba(34,197,94,0.7);border-radius:3px"></span>5+ profissionais</span>
+        <span><span class="msi">check_box_outline_blank</span> Livre</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:14px;height:14px;background:rgba(111,143,91,0.18);border-radius:3px"></span>1–2 profissionais</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:14px;height:14px;background:rgba(111,143,91,0.4);border-radius:3px"></span>3–4 profissionais</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:14px;height:14px;background:rgba(111,143,91,0.7);border-radius:3px"></span>5+ profissionais</span>
         <span style="margin-left:auto;font-style:italic">Clique em uma célula para ver os profissionais</span>
       </div>
     </div>
@@ -573,7 +573,7 @@ function renderDashboard() {
               <div class="list-item-sub">${U.escHtml(U.profNome(a.profissionalId))} • ${U.date(a.data)}</div>
             </div>
             <div class="list-item-value" style="color:var(--success)">${U.fmt(U.calcRepasse(a))}</div>
-          </div>`).join('') : '<div class="empty-state"><div class="empty-icon">📋</div><p>Nenhum atendimento registrado</p></div>'}
+          </div>`).join('') : '<div class="empty-state"><div class="empty-icon"><span class="msi">assignment</span></div><p>Nenhum atendimento registrado</p></div>'}
       </div>
       <div class="card">
         <div class="card-title">Profissionais Ativos <span>${DB.get('profissionais').filter(p=>p.ativo).length} total</span></div>
@@ -608,15 +608,15 @@ function renderDashboard() {
   // Charts
   requestAnimationFrame(() => {
     const isDark = document.documentElement.dataset.theme === 'dark';
-    const gridColor = isDark ? '#334155' : '#e2e8f0';
-    const textColor = isDark ? '#94a3b8' : '#64748b';
+    const gridColor = isDark ? '#3a2f20' : '#e7dcc7';
+    const textColor = isDark ? '#a99b80' : '#8a7c65';
 
     new Chart(document.getElementById('chart-evolucao'), {
       type:'bar',
       data:{ labels:labels6,
         datasets:[
-          { label:'Receita', data:dataRec6, backgroundColor:'rgba(99,102,241,0.7)', borderRadius:6 },
-          { label:'Despesa', data:dataDsp6, backgroundColor:'rgba(239,68,68,0.5)', borderRadius:6 }
+          { label:'Receita', data:dataRec6, backgroundColor:'rgba(163,121,79,0.75)', borderRadius:6 },
+          { label:'Despesa', data:dataDsp6, backgroundColor:'rgba(177,84,63,0.55)', borderRadius:6 }
         ]},
       options:{ responsive:true, maintainAspectRatio:false,
         plugins:{ legend:{ labels:{ color:textColor, boxWidth:12 } } },
@@ -627,7 +627,7 @@ function renderDashboard() {
     const pieLabels = ['Sublocação','Porcentagem','Por Cliente','Por Hora'].filter((_,i)=>[rSubl,rPct,rCli,rHr][i]>0);
     new Chart(document.getElementById('chart-tipos'), {
       type:'doughnut',
-      data:{ labels:pieLabels, datasets:[{ data:pieData, backgroundColor:['#6366f1','#22c55e','#f59e0b','#3b82f6'], borderWidth:2, borderColor:'var(--surface)' }]},
+      data:{ labels:pieLabels, datasets:[{ data:pieData, backgroundColor:['#a3794f','#6f8f5b','#c08a3e','#5f8a86'], borderWidth:2, borderColor:'var(--surface)' }]},
       options:{ responsive:true, maintainAspectRatio:false,
         plugins:{ legend:{ position:'bottom', labels:{ color:textColor, boxWidth:12, padding:10 } } } }
     });
@@ -656,16 +656,16 @@ function renderProfissionais() {
             <td>${p.usaEstacionamento ? U.fmt(p.valorEstacionamento) : '<span class="badge badge-gray">Não</span>'}</td>
             <td><span class="badge ${p.ativo?'badge-success':'badge-danger'}">${p.ativo?'Ativo':'Inativo'}</span></td>
             <td><div class="td-actions">
-              <button class="action-btn view" onclick='viewProf("${p.id}")'>👁</button>
-              <button class="action-btn edit" onclick='editProf("${p.id}")'>✏️</button>
+              <button class="action-btn view" onclick='viewProf("${p.id}")'><span class="msi">visibility</span></button>
+              <button class="action-btn edit" onclick='editProf("${p.id}")'><span class="msi">edit</span></button>
               ${p.ativo
-                ? `<button class="action-btn warning" onclick='toggleAtivoProf("${p.id}")' title="Inativar">⛔</button>`
-                : `<button class="action-btn pay" onclick='toggleAtivoProf("${p.id}")' title="Reativar">↩️</button>`}
-              <button class="action-btn delete" onclick='delProf("${p.id}")'>🗑</button>
+                ? `<button class="action-btn warning" onclick='toggleAtivoProf("${p.id}")' title="Inativar"><span class="msi">person_off</span></button>`
+                : `<button class="action-btn pay" onclick='toggleAtivoProf("${p.id}")' title="Reativar"><span class="msi">how_to_reg</span></button>`}
+              <button class="action-btn delete" onclick='delProf("${p.id}")'><span class="msi">delete</span></button>
             </div></td>
           </tr>`).join('')}
         </tbody>
-      </table></div>` : '<div class="empty-state"><div class="empty-icon">👩‍⚕️</div><h3>Nenhum profissional encontrado</h3></div>';
+      </table></div>` : '<div class="empty-state"><div class="empty-icon"><span class="msi">stethoscope</span></div><h3>Nenhum profissional encontrado</h3></div>';
   }
   function regimedesc(p) {
     if (p.regime==='sublocacao') return `<div style="font-size:11px;color:var(--text-muted)">${U.fmt(p.valorMensal)}/mês</div>`;
@@ -680,11 +680,11 @@ function renderProfissionais() {
     <div class="page-header">
       <h2>Profissionais</h2>
       <div class="page-actions">
-        <button class="btn btn-primary" onclick="editProf()">＋ Novo Profissional</button>
+        <button class="btn btn-primary" onclick="editProf()"><span class="msi">add</span> Novo Profissional</button>
       </div>
     </div>
     <div class="filters-bar">
-      <input class="search-input" placeholder="🔍 Buscar profissional..." id="prof-search">
+      <input class="search-input" placeholder="Buscar profissional..." id="prof-search">
       <select class="filter-select" id="prof-reg-filter">
         <option value="">Todos os regimes</option>
         ${Object.entries(REGIMES).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}
@@ -702,7 +702,7 @@ window.viewProf = (id) => {
   if (!p) return;
   const atends = DB.get('atendimentos').filter(a=>a.profissionalId===id);
   const totalRec = atends.reduce((s,a)=>s+U.calcRepasse(a),0);
-  Modal.open(`👩‍⚕️ ${p.nome}`, `
+  Modal.open(`<span class="msi">stethoscope</span> ${p.nome}`, `
     <div style="display:grid;gap:12px">
       <div class="stat-row">
         ${U.regimeBadge(p.regime)}
@@ -850,7 +850,7 @@ window.editProf = (id) => {
       </div>
     </div>`,
   `<button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button>
-   <button class="btn btn-primary" onclick="saveProf()">💾 Salvar</button>`, 'lg');
+   <button class="btn btn-primary" onclick="saveProf()"><span class="msi">save</span> Salvar</button>`, 'lg');
   regimeFields();
   // Wire up turno pills toggle
   document.getElementById('modal-body').addEventListener('change', e => {
@@ -964,19 +964,19 @@ function renderPacientes() {
             <td>${U.date(p.dataInicio)}</td>
             <td><span class="badge ${p.ativo!==false?'badge-success':'badge-gray'}">${p.ativo!==false?'Ativo':'Inativo'}</span></td>
             <td><div class="td-actions">
-              <button class="action-btn view" onclick='viewPac("${p.id}")'>👁</button>
-              <button class="action-btn edit" onclick='editPac("${p.id}")'>✏️</button>
-              <button class="action-btn delete" onclick='delPac("${p.id}")'>🗑</button>
+              <button class="action-btn view" onclick='viewPac("${p.id}")'><span class="msi">visibility</span></button>
+              <button class="action-btn edit" onclick='editPac("${p.id}")'><span class="msi">edit</span></button>
+              <button class="action-btn delete" onclick='delPac("${p.id}")'><span class="msi">delete</span></button>
             </div></td>
           </tr>`).join('')}
         </tbody></table></div>`
-    : '<div class="empty-state"><div class="empty-icon">🧑</div><h3>Nenhum paciente cadastrado</h3><p>Clique em "Novo Paciente" para começar</p></div>';
+    : '<div class="empty-state"><div class="empty-icon"><span class="msi">group</span></div><h3>Nenhum paciente cadastrado</h3><p>Clique em "Novo Paciente" para começar</p></div>';
   }
   document.getElementById('content').innerHTML = `
     <div class="page-header"><h2>Pacientes</h2>
-      <div class="page-actions"><button class="btn btn-primary" onclick="editPac()">＋ Novo Paciente</button></div>
+      <div class="page-actions"><button class="btn btn-primary" onclick="editPac()"><span class="msi">add</span> Novo Paciente</button></div>
     </div>
-    <div class="filters-bar"><input class="search-input" placeholder="🔍 Buscar paciente..." id="pac-search"></div>
+    <div class="filters-bar"><input class="search-input" placeholder="Buscar paciente..." id="pac-search"></div>
     <div id="pac-list"></div>`;
   document.getElementById('pac-search').oninput = e => { filter=e.target.value; draw(); };
   draw();
@@ -986,7 +986,7 @@ window.viewPac = (id) => {
   const p = DB.getOne('pacientes', id);
   if (!p) return;
   const atends = DB.get('atendimentos').filter(a=>a.pacienteId===id).sort((a,b)=>b.data.localeCompare(a.data)).slice(0,10);
-  Modal.open(`🧑 ${p.nome}`, `
+  Modal.open(`<span class="msi">person</span> ${p.nome}`, `
     <div style="display:grid;gap:14px">
       <div class="form-grid">
         <div><label style="font-size:11px;color:var(--text-muted)">CPF</label><div>${U.escHtml(p.cpf||'—')}</div></div>
@@ -1024,7 +1024,7 @@ window.editPac = (id) => {
       <div class="form-group form-full"><label>Observações</label><textarea id="fp-obs">${U.escHtml(v('obs'))}</textarea></div>
       <div class="form-group form-full"><label class="form-check"><input type="checkbox" id="fp-ativo" ${v('ativo',true)?'checked':''}> Paciente ativo</label></div>
     </div></form>`,
-  `<button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button><button class="btn btn-primary" onclick="savePac('${id||''}')">💾 Salvar</button>`);
+  `<button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button><button class="btn btn-primary" onclick="savePac('${id||''}')"><span class="msi">save</span> Salvar</button>`);
 };
 
 window.savePac = (id) => {
@@ -1082,19 +1082,19 @@ function renderAtendimentos() {
             <td><span class="badge ${a.origemPaciente==='clinica'?'badge-info':'badge-warning'}">${a.origemPaciente==='clinica'?'Clínica':'Profissional'}</span></td>
             <td style="font-weight:600">${U.fmt(a.valor)}</td>
             <td style="color:var(--success);font-weight:600">${U.fmt(U.calcRepasse(a))}</td>
-            <td style="font-size:18px">${a.vistoCliente?'✅':'⬜'}${a.vistoProfissional?'✅':'⬜'}${a.vistoNosi?'✅':'⬜'}</td>
+            <td style="font-size:18px">${a.vistoCliente?'<span class="msi">check_circle</span>':'<span class="msi">check_box_outline_blank</span>'}${a.vistoProfissional?'<span class="msi">check_circle</span>':'<span class="msi">check_box_outline_blank</span>'}${a.vistoNosi?'<span class="msi">check_circle</span>':'<span class="msi">check_box_outline_blank</span>'}</td>
             <td><div class="td-actions">
-              <button class="action-btn edit" onclick='editAtend("${a.id}")'>✏️</button>
-              <button class="action-btn delete" onclick='delAtend("${a.id}")'>🗑</button>
+              <button class="action-btn edit" onclick='editAtend("${a.id}")'><span class="msi">edit</span></button>
+              <button class="action-btn delete" onclick='delAtend("${a.id}")'><span class="msi">delete</span></button>
             </div></td>
           </tr>`).join('')}
-        </tbody></table></div>` : '<div class="empty-state"><div class="empty-icon">📋</div><h3>Nenhum atendimento neste mês</h3></div>'}`;
+        </tbody></table></div>` : '<div class="empty-state"><div class="empty-icon"><span class="msi">assignment</span></div><h3>Nenhum atendimento neste mês</h3></div>'}`;
   }
 
   const profs = DB.get('profissionais').filter(p=>p.ativo);
   document.getElementById('content').innerHTML = `
     <div class="page-header"><h2>Atendimentos</h2>
-      <div class="page-actions"><button class="btn btn-primary" onclick="editAtend()">＋ Registrar Atendimento</button></div>
+      <div class="page-actions"><button class="btn btn-primary" onclick="editAtend()"><span class="msi">add</span> Registrar Atendimento</button></div>
     </div>
     <div class="filters-bar">
       <div class="month-nav">
@@ -1161,7 +1161,7 @@ window.editAtend = (id) => {
       </div>
       <div class="form-group form-full"><label>Observações</label><textarea id="fa-obs">${U.escHtml(v('obs'))}</textarea></div>
     </div></form>`,
-  `<button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button><button class="btn btn-primary" onclick="saveAtend('${id||''}')">💾 Salvar</button>`);
+  `<button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button><button class="btn btn-primary" onclick="saveAtend('${id||''}')"><span class="msi">save</span> Salvar</button>`);
 
   window.atUpdatePercent = () => {
     const profId = document.getElementById('fa-prof').value;
@@ -1228,7 +1228,7 @@ function renderCobranca() {
               <div class="billing-prof">${U.escHtml(p.profissao)} • ${U.regimeBadge(p.regime)}</div>
             </div>
             <span class="badge ${c.boletoPago?'badge-success':c.boletoEmitido?'badge-warning':'badge-gray'}">
-              ${c.boletoPago?'✅ Pago':c.boletoEmitido?'🔄 Emitido':'⏳ Pendente'}
+              ${c.boletoPago?'<span class="msi">check_circle</span> Pago':c.boletoEmitido?'<span class="msi">autorenew</span> Emitido':'<span class="msi">hourglass_empty</span> Pendente'}
             </span>
           </div>
           <div class="billing-amounts">
@@ -1245,12 +1245,12 @@ function renderCobranca() {
           <div class="billing-footer">
             <div style="font-size:18px;font-weight:800;color:var(--primary)">Total: ${U.fmt(c.totalPagar)}${c.valorOverride!=null?' <span style="font-size:11px;font-weight:500;color:var(--text-muted)">(valor ajustado)</span>':''}</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
-              ${['sublocacao','turno'].includes(p.regime)?`<button class="btn btn-sm btn-secondary" onclick='editHorasExtras("${p.id}",${y},${m})'>⏰ H.Extra: ${c.qtdHorasExtras||0}h</button>`:''}
-              ${!c.boletoEmitido?`<button class="btn btn-sm btn-outline" onclick='emitirBoleto("${p.id}",${y},${m})'>📄 Emitir Boleto</button>`:''}
-              ${!c.boletoPago?`<button class="btn btn-sm btn-success" onclick='marcarPago("${p.id}",${y},${m})'>✅ Marcar Pago</button>`:''}
+              ${['sublocacao','turno'].includes(p.regime)?`<button class="btn btn-sm btn-secondary" onclick='editHorasExtras("${p.id}",${y},${m})'><span class="msi">more_time</span> H.Extra: ${c.qtdHorasExtras||0}h</button>`:''}
+              ${!c.boletoEmitido?`<button class="btn btn-sm btn-outline" onclick='emitirBoleto("${p.id}",${y},${m})'><span class="msi">receipt_long</span> Emitir Boleto</button>`:''}
+              ${!c.boletoPago?`<button class="btn btn-sm btn-success" onclick='marcarPago("${p.id}",${y},${m})'><span class="msi">check_circle</span> Marcar Pago</button>`:''}
               ${c.boletoPago?`<span style="font-size:12px;color:var(--text-muted)">Pago em ${U.date(c.boletoPago)}</span>`:''}
-              <button class="btn btn-sm btn-secondary" onclick='editValorCobranca("${p.id}",${y},${m})'>💲 Editar Valor</button>
-              <button class="btn btn-sm btn-danger" onclick='excluirCobranca("${p.id}",${y},${m})'>🗑 Excluir Cobrança</button>
+              <button class="btn btn-sm btn-secondary" onclick='editValorCobranca("${p.id}",${y},${m})'><span class="msi">attach_money</span> Editar Valor</button>
+              <button class="btn btn-sm btn-danger" onclick='excluirCobranca("${p.id}",${y},${m})'><span class="msi">delete</span> Excluir Cobrança</button>
             </div>
           </div>
         </div>`).join('')}
@@ -1259,7 +1259,7 @@ function renderCobranca() {
     const excluidas = DB.get('cobrancas_excluidas').filter(c => c.ano===y && c.mes===m).sort((a,b)=>(b.excluidoEm||'').localeCompare(a.excluidoEm||''));
     document.getElementById('cobr-excluidas').innerHTML = `
       <div class="card-title" style="cursor:pointer;user-select:none" onclick="toggleExcluidasCobranca()">
-        🗄 Cobranças Excluídas <span>${excluidas.length} neste mês — clique para ver/ocultar</span>
+        <span class="msi">archive</span> Cobranças Excluídas <span>${excluidas.length} neste mês — clique para ver/ocultar</span>
       </div>
       <div id="cobr-excluidas-body" style="display:none;margin-top:8px">
         ${excluidas.length ? `<div class="table-wrap"><table>
@@ -1268,7 +1268,7 @@ function renderCobranca() {
             <tr>
               <td>${U.escHtml(e.profissionalNome)}</td>
               <td>${U.fmt(e.snapshot?.totalPagar)}</td>
-              <td>${e.snapshot?.boletoPago?'✅ Pago':e.snapshot?.boletoEmitido?'🔄 Emitido':'⏳ Pendente'}</td>
+              <td>${e.snapshot?.boletoPago?'<span class="msi">check_circle</span> Pago':e.snapshot?.boletoEmitido?'<span class="msi">autorenew</span> Emitido':'<span class="msi">hourglass_empty</span> Pendente'}</td>
               <td>${U.escHtml(e.excluidoPor||'—')}</td>
               <td>${e.excluidoEm?new Date(e.excluidoEm).toLocaleString('pt-BR'):'—'}</td>
             </tr>`).join('')}
@@ -1300,7 +1300,7 @@ function renderCobranca() {
   window.editHorasExtras = (profId, ano, mes) => {
     const p = DB.getOne('profissionais', profId);
     const existing = DB.get('cobrancas').find(c=>c.profissionalId===profId&&c.ano===ano&&c.mes===mes)||{};
-    Modal.open(`⏰ Horas Extras — ${p?.nome}`, `
+    Modal.open(`<span class="msi">more_time</span> Horas Extras — ${p?.nome}`, `
       <div class="form-group"><label>Quantidade de Horas Extras</label>
         <input id="he-qtd" type="number" step="1" min="0" value="${existing.qtdHorasExtras||0}">
       </div>
@@ -1327,7 +1327,7 @@ function renderCobranca() {
       <div class="form-group"><label>Data do Pagamento</label><input id="mp-data" type="date" value="${U.isoToday()}"></div>
       <div class="form-group"><label>Banco / Forma</label><input id="mp-banco" placeholder="Ex: Pix Nubank, Boleto BB..."></div>`,
     `<button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button>
-     <button class="btn btn-success" onclick="confirmPago('${profId}',${ano},${mes})">✅ Confirmar</button>`, 'sm');
+     <button class="btn btn-success" onclick="confirmPago('${profId}',${ano},${mes})"><span class="msi">check_circle</span> Confirmar</button>`, 'sm');
   };
   window.confirmPago = (profId, ano, mes) => {
     const dt = document.getElementById('mp-data').value;
@@ -1338,7 +1338,7 @@ function renderCobranca() {
   window.editValorCobranca = (profId, ano, mes) => {
     const p = DB.getOne('profissionais', profId);
     const c = getCobranca(p, ano, mes);
-    Modal.open(`💲 Editar Valor da Cobrança — ${p?.nome}`, `
+    Modal.open(`<span class="msi">attach_money</span> Editar Valor da Cobrança — ${p?.nome}`, `
       <div class="form-group"><label>Valor da Cobrança (R$)</label>
         <input id="ev-valor" type="number" step="0.01" value="${c.totalPagar}">
       </div>
@@ -1358,7 +1358,7 @@ function renderCobranca() {
   };
   window.excluirCobranca = (profId, ano, mes) => {
     const p = DB.getOne('profissionais', profId);
-    Modal.open(`🗑 Excluir Cobrança — ${U.escHtml(p?.nome||'')}`, `
+    Modal.open(`<span class="msi">delete</span> Excluir Cobrança — ${U.escHtml(p?.nome||'')}`, `
       <p style="color:var(--text-2);margin-bottom:12px">O que você deseja fazer?</p>
       <div style="display:grid;gap:10px">
         <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px 12px">
@@ -1371,8 +1371,8 @@ function renderCobranca() {
         </div>
       </div>`,
     `<button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button>
-     <button class="btn btn-secondary" onclick="inativarProfDaCobranca('${profId}')">🚫 Inativar Profissional</button>
-     <button class="btn btn-danger" onclick="confirmExcluirCobranca('${profId}',${ano},${mes})">🗑 Apenas Excluir Cobrança</button>`, 'sm');
+     <button class="btn btn-secondary" onclick="inativarProfDaCobranca('${profId}')"><span class="msi">person_off</span> Inativar Profissional</button>
+     <button class="btn btn-danger" onclick="confirmExcluirCobranca('${profId}',${ano},${mes})"><span class="msi">delete</span> Apenas Excluir Cobrança</button>`, 'sm');
   };
   window.confirmExcluirCobranca = (profId, ano, mes) => {
     const p = DB.getOne('profissionais', profId);
@@ -1436,17 +1436,17 @@ function renderDespesas() {
             <td><span class="badge badge-gray" style="font-size:11px">${U.escHtml(CATS_DESPESA[d.categoria]||d.categoria)}</span></td>
             <td>${U.escHtml(subcatLabel)}${d.descricao?`<div style="font-size:11px;color:var(--text-muted)">${U.escHtml(d.descricao)}</div>`:''}</td>
             <td style="text-align:right;font-weight:600;color:var(--danger)">${U.fmt(d.valor)}</td>
-            <td><div class="td-actions"><button class="action-btn edit" onclick='editDesp("${d.id}")'>✏️</button><button class="action-btn delete" onclick='delDesp("${d.id}")'>🗑</button></div></td>
+            <td><div class="td-actions"><button class="action-btn edit" onclick='editDesp("${d.id}")'><span class="msi">edit</span></button><button class="action-btn delete" onclick='delDesp("${d.id}")'><span class="msi">delete</span></button></div></td>
           </tr>`;}).join('')}
           <tr style="background:var(--surface-2)"><td colspan="3" style="font-weight:700;padding:10px 14px">TOTAL</td><td style="text-align:right;font-weight:800;color:var(--danger);padding:10px 14px">${U.fmt(total)}</td><td></td></tr>
-        </tbody></table></div>` : '<div class="empty-state"><div class="empty-icon">📉</div><h3>Nenhuma despesa registrada</h3></div>'}`;
+        </tbody></table></div>` : '<div class="empty-state"><div class="empty-icon"><span class="msi">trending_down</span></div><h3>Nenhuma despesa registrada</h3></div>'}`;
   }
 
   document.getElementById('content').innerHTML = `
     <div class="page-header"><h2>Despesas</h2>
       <div class="page-actions">
-        <button class="btn btn-secondary" onclick="gerenciarCategorias()">⚙️ Categorias</button>
-        <button class="btn btn-primary" onclick="editDesp()">＋ Nova Despesa</button>
+        <button class="btn btn-secondary" onclick="gerenciarCategorias()"><span class="msi">settings</span> Categorias</button>
+        <button class="btn btn-primary" onclick="editDesp()"><span class="msi">add</span> Nova Despesa</button>
       </div>
     </div>
     <div class="filters-bar">
@@ -1505,7 +1505,7 @@ window.editDesp = (id) => {
       </div>
       <div class="form-group form-full"><label>Observações</label><textarea id="fd-obs">${U.escHtml(v('obs'))}</textarea></div>
     </div></form>`,
-  `<button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button><button class="btn btn-primary" onclick="saveDesp('${id||''}')">💾 Salvar</button>`);
+  `<button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button><button class="btn btn-primary" onclick="saveDesp('${id||''}')"><span class="msi">save</span> Salvar</button>`);
 
   window._dCatChange = window.dCatChange = () => {
     const cat = document.getElementById('fd-cat').value;
@@ -1546,12 +1546,12 @@ window.gerenciarCategorias = () => {
           <td style="padding:8px;border-bottom:1px solid var(--border)">${grpLabel[c.g]||c.g}</td>
           <td style="padding:8px;border-bottom:1px solid var(--border);font-weight:600">${U.escHtml(c.l)}</td>
           <td style="padding:8px;border-bottom:1px solid var(--border)"><span class="badge badge-gray">${c.k}</span></td>
-          <td style="padding:8px;border-bottom:1px solid var(--border)"><button class="action-btn delete" onclick="delCat('${c.id}')">🗑</button></td>
+          <td style="padding:8px;border-bottom:1px solid var(--border)"><button class="action-btn delete" onclick="delCat('${c.id}')"><span class="msi">delete</span></button></td>
         </tr>`).join('')}
         </tbody></table>` : '<p style="color:var(--text-muted);font-size:13px;padding:12px 0">Nenhuma categoria customizada ainda.</p>';
   }
 
-  Modal.open('⚙️ Gerenciar Categorias de Despesas', `
+  Modal.open('<span class="msi">settings</span> Gerenciar Categorias de Despesas', `
     <p style="color:var(--text-muted);font-size:12.5px;margin-bottom:16px">Adicione subcategorias além das pré-definidas. Elas aparecerão automaticamente no formulário de despesas e no balancete.</p>
     <div class="form-grid" style="margin-bottom:16px">
       <div class="form-group"><label>Grupo *</label>
@@ -1563,7 +1563,7 @@ window.gerenciarCategorias = () => {
       </div>
       <div class="form-group"><label>Nome da Categoria *</label><input id="nc-nome" placeholder="Ex: Honorários Contador..."></div>
     </div>
-    <button class="btn btn-primary btn-sm" onclick="addCat()">＋ Adicionar</button>
+    <button class="btn btn-primary btn-sm" onclick="addCat()"><span class="msi">add</span> Adicionar</button>
     <div class="section-title" style="margin-top:16px">Categorias customizadas</div>
     <div id="cat-list"></div>`,
   `<button class="btn btn-secondary" onclick="Modal.close()">Fechar</button>`, 'lg');
@@ -1608,17 +1608,17 @@ window.gerenciarCategoriasReceita = () => {
         <tbody>${custom.map(c=>`<tr>
           <td style="padding:8px;border-bottom:1px solid var(--border);font-weight:600">${U.escHtml(c.l)}</td>
           <td style="padding:8px;border-bottom:1px solid var(--border)"><span class="badge badge-gray">${c.k}</span></td>
-          <td style="padding:8px;border-bottom:1px solid var(--border)"><button class="action-btn delete" onclick="delRecCat('${c.id}')">🗑</button></td>
+          <td style="padding:8px;border-bottom:1px solid var(--border)"><button class="action-btn delete" onclick="delRecCat('${c.id}')"><span class="msi">delete</span></button></td>
         </tr>`).join('')}
         </tbody></table>` : '<p style="color:var(--text-muted);font-size:13px;padding:12px 0">Nenhuma categoria customizada ainda.</p>';
   }
 
-  Modal.open('⚙️ Gerenciar Categorias de Receitas', `
+  Modal.open('<span class="msi">settings</span> Gerenciar Categorias de Receitas', `
     <p style="color:var(--text-muted);font-size:12.5px;margin-bottom:16px">Adicione categorias além das pré-definidas. Elas aparecerão no formulário de receitas e no balancete.</p>
     <div class="form-grid" style="margin-bottom:16px">
       <div class="form-group form-full"><label>Nome da Categoria *</label><input id="nrc-nome" placeholder="Ex: Venda de Produtos..."></div>
     </div>
-    <button class="btn btn-primary btn-sm" onclick="addRecCat()">＋ Adicionar</button>
+    <button class="btn btn-primary btn-sm" onclick="addRecCat()"><span class="msi">add</span> Adicionar</button>
     <div class="section-title" style="margin-top:16px">Categorias customizadas</div>
     <div id="rcat-list"></div>`,
   `<button class="btn btn-secondary" onclick="Modal.close()">Fechar</button>`, 'lg');
@@ -1691,17 +1691,17 @@ function renderReceitas() {
             <td>${U.escHtml(r.descricao||'—')}</td>
             <td>${U.escHtml(r.formaPagamento||'—')}</td>
             <td style="text-align:right;font-weight:600;color:var(--success)">${U.fmt(r.valor)}</td>
-            <td><div class="td-actions"><button class="action-btn edit" onclick='editReceita("${r.id}")'>✏️</button><button class="action-btn delete" onclick='delReceita("${r.id}")'>🗑</button></div></td>
+            <td><div class="td-actions"><button class="action-btn edit" onclick='editReceita("${r.id}")'><span class="msi">edit</span></button><button class="action-btn delete" onclick='delReceita("${r.id}")'><span class="msi">delete</span></button></div></td>
           </tr>`).join('')}
           <tr style="background:var(--surface-2)"><td colspan="4" style="font-weight:700;padding:10px 14px">TOTAL</td><td style="text-align:right;font-weight:800;color:var(--success);padding:10px 14px">${U.fmt(total)}</td><td></td></tr>
-        </tbody></table></div>` : '<div class="empty-state"><div class="empty-icon">💵</div><h3>Nenhum lançamento manual neste mês</h3><p>Registre entradas como aluguel de auditório, garagens, saldo anterior etc.</p></div>'}`;
+        </tbody></table></div>` : '<div class="empty-state"><div class="empty-icon"><span class="msi">payments</span></div><h3>Nenhum lançamento manual neste mês</h3><p>Registre entradas como aluguel de auditório, garagens, saldo anterior etc.</p></div>'}`;
   }
 
   document.getElementById('content').innerHTML = `
     <div class="page-header"><h2>Receitas</h2>
       <div class="page-actions">
-        <button class="btn btn-secondary" onclick="gerenciarCategoriasReceita()">⚙️ Categorias</button>
-        <button class="btn btn-primary" onclick="editReceita()">＋ Nova Receita</button>
+        <button class="btn btn-secondary" onclick="gerenciarCategoriasReceita()"><span class="msi">settings</span> Categorias</button>
+        <button class="btn btn-primary" onclick="editReceita()"><span class="msi">add</span> Nova Receita</button>
       </div>
     </div>
     <div class="filters-bar">
@@ -1749,7 +1749,7 @@ window.editReceita = (id) => {
       </div>
       <div class="form-group form-full"><label>Observações</label><textarea id="fr-obs">${U.escHtml(v('obs'))}</textarea></div>
     </div></form>`,
-  `<button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button><button class="btn btn-primary" onclick="saveReceita('${id||''}')">💾 Salvar</button>`);
+  `<button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button><button class="btn btn-primary" onclick="saveReceita('${id||''}')"><span class="msi">save</span> Salvar</button>`);
 };
 
 window.saveReceita = (id) => {
@@ -1824,7 +1824,7 @@ function renderBalancete() {
     document.getElementById('balancete-content').innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <h3>Balancete — ${MESES[viewMonth-1]} / ${viewYear}</h3>
-        <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ Imprimir</button>
+        <button class="btn btn-secondary btn-sm" onclick="window.print()"><span class="msi">print</span> Imprimir</button>
       </div>
       <div class="table-wrap"><table>
         <thead><tr><th>Categoria</th><th style="text-align:right">Valor (R$)</th></tr></thead>
@@ -1848,7 +1848,7 @@ function renderBalancete() {
     document.getElementById('balancete-content').innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <h3>Resumo Anual — ${viewYear}</h3>
-        <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ Imprimir</button>
+        <button class="btn btn-secondary btn-sm" onclick="window.print()"><span class="msi">print</span> Imprimir</button>
       </div>
       <div class="table-wrap"><table>
         <thead><tr><th>Mês</th><th style="text-align:right">Receitas</th><th style="text-align:right">Despesas</th><th style="text-align:right">Resultado</th></tr></thead>
@@ -1921,7 +1921,7 @@ function renderBalancete() {
 
 /* ===== INIT ===== */
 function updateThemeBtn(theme) {
-  document.getElementById('theme-icon').textContent = theme==='dark' ? '☀️' : '🌙';
+  document.getElementById('theme-icon').textContent = theme==='dark' ? 'light_mode' : 'dark_mode';
   document.getElementById('theme-label').textContent = theme==='dark' ? 'Modo Claro' : 'Modo Escuro';
 }
 
