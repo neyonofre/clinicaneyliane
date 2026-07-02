@@ -1243,7 +1243,7 @@ function renderCobranca() {
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               ${['sublocacao','turno'].includes(p.regime)?`<button class="btn btn-sm btn-secondary" onclick='editHorasExtras("${p.id}",${y},${m})'>⏰ H.Extra: ${c.qtdHorasExtras||0}h</button>`:''}
               ${!c.boletoEmitido?`<button class="btn btn-sm btn-outline" onclick='emitirBoleto("${p.id}",${y},${m})'>📄 Emitir Boleto</button>`:''}
-              ${c.boletoEmitido&&!c.boletoPago?`<button class="btn btn-sm btn-success" onclick='marcarPago("${p.id}",${y},${m})'>✅ Marcar Pago</button>`:''}
+              ${!c.boletoPago?`<button class="btn btn-sm btn-success" onclick='marcarPago("${p.id}",${y},${m})'>✅ Marcar Pago</button>`:''}
               ${c.boletoPago?`<span style="font-size:12px;color:var(--text-muted)">Pago em ${U.date(c.boletoPago)}</span>`:''}
               <button class="btn btn-sm btn-secondary" onclick='editValorCobranca("${p.id}",${y},${m})'>💲 Editar Valor</button>
               ${(c.boletoEmitido||c.boletoPago||c.valorOverride!=null)?`<button class="btn btn-sm btn-danger" onclick='excluirCobranca("${p.id}",${y},${m})'>🗑 Excluir Cobrança</button>`:''}
