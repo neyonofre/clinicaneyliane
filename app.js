@@ -90,8 +90,12 @@ const FIREBASE_CONFIG = {
   measurementId:     "G-N82TCFD589"
 };
 
+/* ===== SESSION (auditoria: quem está logado) ===== */
+const Session = { email: null };
+function currentUser() { return Session.email || 'Operador local'; }
+
 /* ===== DATABASE ===== */
-const DB_TABLES = ['profissionais','pacientes','atendimentos','despesas','cobrancas','receitas','custom_subcats','custom_rec_cats'];
+const DB_TABLES = ['profissionais','pacientes','atendimentos','despesas','cobrancas','cobrancas_excluidas','receitas','custom_subcats','custom_rec_cats'];
 
 const DB = {
   _cache: {},
@@ -1246,13 +1250,37 @@ function renderCobranca() {
               ${!c.boletoPago?`<button class="btn btn-sm btn-success" onclick='marcarPago("${p.id}",${y},${m})'>✅ Marcar Pago</button>`:''}
               ${c.boletoPago?`<span style="font-size:12px;color:var(--text-muted)">Pago em ${U.date(c.boletoPago)}</span>`:''}
               <button class="btn btn-sm btn-secondary" onclick='editValorCobranca("${p.id}",${y},${m})'>💲 Editar Valor</button>
-              ${(c.boletoEmitido||c.boletoPago||c.valorOverride!=null)?`<button class="btn btn-sm btn-danger" onclick='excluirCobranca("${p.id}",${y},${m})'>🗑 Excluir Cobrança</button>`:''}
-              <button class="btn btn-sm btn-secondary" onclick='editCobr("${p.id}",${y},${m})'>✏️</button>
+              <button class="btn btn-sm btn-danger" onclick='excluirCobranca("${p.id}",${y},${m})'>🗑 Excluir Cobrança</button>
             </div>
           </div>
         </div>`).join('')}
       </div>`;
+
+    const excluidas = DB.get('cobrancas_excluidas').filter(c => c.ano===y && c.mes===m).sort((a,b)=>(b.excluidoEm||'').localeCompare(a.excluidoEm||''));
+    document.getElementById('cobr-excluidas').innerHTML = `
+      <div class="card-title" style="cursor:pointer;user-select:none" onclick="toggleExcluidasCobranca()">
+        🗄 Cobranças Excluídas <span>${excluidas.length} neste mês — clique para ver/ocultar</span>
+      </div>
+      <div id="cobr-excluidas-body" style="display:none;margin-top:8px">
+        ${excluidas.length ? `<div class="table-wrap"><table>
+          <thead><tr><th>Profissional</th><th>Valor</th><th>Estava</th><th>Excluído por</th><th>Quando</th></tr></thead>
+          <tbody>${excluidas.map(e => `
+            <tr>
+              <td>${U.escHtml(e.profissionalNome)}</td>
+              <td>${U.fmt(e.snapshot?.totalPagar)}</td>
+              <td>${e.snapshot?.boletoPago?'✅ Pago':e.snapshot?.boletoEmitido?'🔄 Emitido':'⏳ Pendente'}</td>
+              <td>${U.escHtml(e.excluidoPor||'—')}</td>
+              <td>${e.excluidoEm?new Date(e.excluidoEm).toLocaleString('pt-BR'):'—'}</td>
+            </tr>`).join('')}
+          </tbody></table></div>`
+        : '<p style="color:var(--text-muted);font-size:13px">Nenhuma cobrança excluída neste mês.</p>'}
+      </div>`;
   }
+
+  window.toggleExcluidasCobranca = () => {
+    const body = document.getElementById('cobr-excluidas-body');
+    if (body) body.style.display = body.style.display === 'none' ? 'block' : 'none';
+  };
 
   document.getElementById('content').innerHTML = `
     <div class="page-header"><h2>Cobrança Mensal</h2></div>
@@ -1263,7 +1291,8 @@ function renderCobranca() {
         <button onclick="cobrNavMes(1)">›</button>
       </div>
     </div>
-    <div id="cobr-list"></div>`;
+    <div id="cobr-list"></div>
+    <div class="card" style="margin-top:20px" id="cobr-excluidas"></div>`;
 
   window.cobrNavMes = (d) => { m+=d; if(m>12){m=1;y++;}if(m<1){m=12;y--;} document.getElementById('cobr-month-label').textContent=`${MESES[m-1]} ${y}`; draw(); };
   document.getElementById('cobr-month-label').textContent = `${MESES[m-1]} ${y}`;
@@ -1306,26 +1335,6 @@ function renderCobranca() {
     saveCobrancaField(profId, ano, mes, { boletoPago:dt, banco });
     Modal.close(); toast('Pagamento registrado!','success'); draw();
   };
-  window.editCobr = (profId, ano, mes) => {
-    const existing = DB.get('cobrancas').find(c=>c.profissionalId===profId&&c.ano===ano&&c.mes===mes)||{};
-    Modal.open('Editar Cobrança', `
-      <div class="form-grid">
-        <div class="form-group"><label>Boleto Emitido (data)</label><input id="ec-emitido" type="date" value="${existing.boletoEmitido||''}"></div>
-        <div class="form-group"><label>Boleto Pago (data)</label><input id="ec-pago" type="date" value="${existing.boletoPago||''}"></div>
-        <div class="form-group"><label>Banco / Forma de Pagamento</label><input id="ec-banco" value="${existing.banco||''}"></div>
-        <div class="form-group"><label>Observações</label><input id="ec-obs" value="${existing.obs||''}"></div>
-      </div>`,
-    `<button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button><button class="btn btn-primary" onclick="saveEditCobr('${profId}',${ano},${mes})">Salvar</button>`);
-  };
-  window.saveEditCobr = (profId, ano, mes) => {
-    saveCobrancaField(profId, ano, mes, {
-      boletoEmitido: document.getElementById('ec-emitido').value||null,
-      boletoPago: document.getElementById('ec-pago').value||null,
-      banco: document.getElementById('ec-banco').value,
-      obs: document.getElementById('ec-obs').value
-    });
-    Modal.close(); toast('Cobrança atualizada!','success'); draw();
-  };
   window.editValorCobranca = (profId, ano, mes) => {
     const p = DB.getOne('profissionais', profId);
     const c = getCobranca(p, ano, mes);
@@ -1349,11 +1358,44 @@ function renderCobranca() {
   };
   window.excluirCobranca = (profId, ano, mes) => {
     const p = DB.getOne('profissionais', profId);
-    Modal.confirm(`Excluir a cobrança de <strong>${U.escHtml(p?.nome)}</strong> deste mês? Ela deixa de contar como receita e volta ao estado pendente.`, () => {
-      const list = DB.get('cobrancas').filter(c => !(c.profissionalId===profId && c.ano===ano && c.mes===mes));
-      DB.set('cobrancas', list);
-      toast('Cobrança excluída', 'warning'); draw();
-    });
+    Modal.open(`🗑 Excluir Cobrança — ${U.escHtml(p?.nome||'')}`, `
+      <p style="color:var(--text-2);margin-bottom:12px">O que você deseja fazer?</p>
+      <div style="display:grid;gap:10px">
+        <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px 12px">
+          <strong>Apenas excluir esta cobrança</strong>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Remove o boleto/pagamento deste mês (vai para o histórico de Cobranças Excluídas, com registro de quem excluiu) e volta ao estado pendente. O profissional continua ativo normalmente.</div>
+        </div>
+        <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px 12px">
+          <strong>Inativar o profissional</strong>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Ele deixa de gerar cobrança a partir de agora (nesta e nas próximas vezes). O histórico é mantido e ele pode ser reativado depois em Profissionais.</div>
+        </div>
+      </div>`,
+    `<button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button>
+     <button class="btn btn-secondary" onclick="inativarProfDaCobranca('${profId}')">🚫 Inativar Profissional</button>
+     <button class="btn btn-danger" onclick="confirmExcluirCobranca('${profId}',${ano},${mes})">🗑 Apenas Excluir Cobrança</button>`, 'sm');
+  };
+  window.confirmExcluirCobranca = (profId, ano, mes) => {
+    const p = DB.getOne('profissionais', profId);
+    if (p) {
+      const snapshot = getCobranca(p, ano, mes);
+      const arquivadas = DB.get('cobrancas_excluidas');
+      arquivadas.push({
+        id: U.id(), profissionalId: profId, profissionalNome: p.nome, ano, mes,
+        snapshot, excluidoPor: currentUser(), excluidoEm: new Date().toISOString()
+      });
+      DB.set('cobrancas_excluidas', arquivadas);
+    }
+    const list = DB.get('cobrancas').filter(c => !(c.profissionalId===profId && c.ano===ano && c.mes===mes));
+    DB.set('cobrancas', list);
+    Modal.close();
+    toast('Cobrança excluída e arquivada', 'warning'); draw();
+  };
+  window.inativarProfDaCobranca = (profId) => {
+    const p = DB.getOne('profissionais', profId);
+    if (!p) return;
+    DB.save('profissionais', { ...p, ativo:false });
+    Modal.close();
+    toast('Profissional inativado', 'warning'); draw();
   };
 
   function saveCobrancaField(profId, ano, mes, fields) {
@@ -1389,7 +1431,7 @@ function renderDespesas() {
         <tbody>${list.map(d=>{
           const subcatLabel = getAllSubcats().find(s=>s.k===d.subcategoria)?.l || d.subcategoria || '—';
           return `
-          <tr>
+          <tr title="${d.criadoPor?`Lançado por ${U.escHtml(d.criadoPor)}`:''}">
             <td>${U.date(d.data)}</td>
             <td><span class="badge badge-gray" style="font-size:11px">${U.escHtml(CATS_DESPESA[d.categoria]||d.categoria)}</span></td>
             <td>${U.escHtml(subcatLabel)}${d.descricao?`<div style="font-size:11px;color:var(--text-muted)">${U.escHtml(d.descricao)}</div>`:''}</td>
@@ -1475,9 +1517,11 @@ window.saveDesp = (id) => {
   const g = i => document.getElementById(i);
   const data = g('fd-data').value, valor = U.parseNum(g('fd-valor').value), cat = g('fd-cat').value;
   if (!data || !valor || !cat) { toast('Preencha todos os campos obrigatórios','error'); return; }
+  const prev = id ? DB.getOne('despesas', id) : null;
   const rec = { id:id||U.id(), data, valor, categoria:cat, subcategoria:g('fd-subcat').value,
     descricao:g('fd-desc').value.trim(), formaPagamento:g('fd-forma').value, obs:g('fd-obs').value.trim(),
-    createdAt: id?(DB.getOne('despesas',id)||{}).createdAt:new Date().toISOString() };
+    createdAt: prev ? prev.createdAt : new Date().toISOString(),
+    criadoPor: prev ? prev.criadoPor : currentUser() };
   DB.save('despesas', rec);
   Modal.close();
   toast(id?'Despesa atualizada!':'Despesa registrada!','success');
@@ -1641,7 +1685,7 @@ function renderReceitas() {
       ${list.length ? `<div class="table-wrap"><table>
         <thead><tr><th>Data</th><th>Categoria</th><th>Descrição</th><th>Forma Pag.</th><th style="text-align:right">Valor</th><th style="text-align:right">Ações</th></tr></thead>
         <tbody>${list.map(r=>`
-          <tr>
+          <tr title="${r.criadoPor?`Lançado por ${U.escHtml(r.criadoPor)}`:''}">
             <td>${U.date(r.data)}</td>
             <td><span class="badge badge-success" style="font-size:11px">${U.escHtml(getAllRecCats().find(c=>c.k===r.categoria)?.l||r.categoria)}</span></td>
             <td>${U.escHtml(r.descricao||'—')}</td>
@@ -1712,9 +1756,11 @@ window.saveReceita = (id) => {
   const g = i => document.getElementById(i);
   const data = g('fr-data').value, valor = U.parseNum(g('fr-valor').value), cat = g('fr-cat').value;
   if (!data || !valor || !cat) { toast('Preencha todos os campos obrigatórios','error'); return; }
+  const prev = id ? DB.getOne('receitas', id) : null;
   const rec = { id:id||U.id(), data, valor, categoria:cat, descricao:g('fr-desc').value.trim(),
     formaPagamento:g('fr-forma').value, obs:g('fr-obs').value.trim(),
-    createdAt: id?(DB.getOne('receitas',id)||{}).createdAt:new Date().toISOString() };
+    createdAt: prev ? prev.createdAt : new Date().toISOString(),
+    criadoPor: prev ? prev.criadoPor : currentUser() };
   DB.save('receitas', rec);
   Modal.close();
   toast(id?'Receita atualizada!':'Receita registrada!','success');
@@ -1944,12 +1990,13 @@ async function init() {
       DB._fs = firebase.firestore();
       DB._useFirebase = true;
       // Wait for auth state (prompts login if not authenticated)
-      await new Promise(resolve => {
+      const user = await new Promise(resolve => {
         firebase.auth().onAuthStateChanged(user => {
           if (user) resolve(user);
           else showLoginOverlay(resolve);
         });
       });
+      Session.email = user?.email || null;
       // Show logout button
       const logoutBtn = document.getElementById('btn-logout');
       logoutBtn.style.display = 'flex';
