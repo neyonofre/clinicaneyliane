@@ -239,34 +239,6 @@ const PageState = {
 };
 
 /* ===== HELPERS ===== */
-// A profissional só entra no cálculo de sublocação/turno nos meses em que o contrato
-// já havia começado e, se foi desativado, até o mês da desativação (dataInativacao).
-function profissionalAtivoNoMes(p, yr, mo) {
-  const monthStart = new Date(yr, mo-1, 1);
-  const monthEnd = new Date(yr, mo, 0);
-  if (p.dataContrato) {
-    const start = U.parseISODate(p.dataContrato);
-    if (start && start > monthEnd) return false;
-  }
-  if (!p.ativo) {
-    const cutoff = p.dataInativacao ? U.parseISODate(p.dataInativacao) : new Date();
-    if (cutoff && cutoff < monthStart) return false;
-  }
-  return true;
-}
-
-function getSublocacaoRevenue(yr, mo) {
-  return DB.get('profissionais')
-    .filter(p => ['sublocacao','turno'].includes(p.regime) && profissionalAtivoNoMes(p, yr, mo))
-    .reduce((s, p) => {
-      const c = DB.get('cobrancas').find(c2 => c2.profissionalId===p.id && c2.ano===yr && c2.mes===mo) || {};
-      const base = p.regime==='sublocacao' ? (p.valorMensal||0) : (p.valorTurno||0);
-      const estac = p.usaEstacionamento ? (p.valorEstacionamento||0) : 0;
-      const he = (c.qtdHorasExtras||0) * (p.valorHoraExtra||50);
-      return s + base + estac + he;
-    }, 0);
-}
-
 function getAllSubcats() {
   return [...SUBCATS, ...DB.get('custom_subcats')];
 }
@@ -277,20 +249,47 @@ function getReceitasMonth(yr, mo) {
   return DB.get('receitas').filter(r => { const d=U.parseISODate(r.data); return d && d.getFullYear()===yr && d.getMonth()+1===mo; });
 }
 
+// Calcula a cobrança (valor esperado) de um profissional num mês: base de sublocação/turno
+// (+ estacionamento + horas extras) ou o repasse somado dos atendimentos daquele mês.
+// Se houver um valor editado manualmente (valorOverride) na cobrança salva, ele prevalece.
+function getCobranca(p, yr, mo) {
+  const existing = DB.get('cobrancas').find(c => c.profissionalId===p.id && c.ano===yr && c.mes===mo);
+  const c = existing || { profissionalId:p.id, mes:mo, ano:yr, boletoEmitido:null, boletoPago:null, banco:'', obs:'', qtdHorasExtras:0 };
+  let auto;
+  if (['sublocacao','turno'].includes(p.regime)) {
+    const base = p.regime==='sublocacao' ? (p.valorMensal||0) : (p.valorTurno||0);
+    const estac = p.usaEstacionamento ? (p.valorEstacionamento||0) : 0;
+    const he = (c.qtdHorasExtras||0) * (p.valorHoraExtra||50);
+    auto = { valorBase:base, valorEstacionamento:estac, qtdHorasExtras:c.qtdHorasExtras||0, valorHorasExtras:he, totalAtendimentos:0, totalRepasse:0, totalAuto:base+estac+he };
+  } else {
+    const atends = DB.get('atendimentos').filter(a => { const d=U.parseISODate(a.data); return a.profissionalId===p.id && d && d.getFullYear()===yr && d.getMonth()+1===mo; });
+    const totalAtend = atends.reduce((s,a)=>s+(a.valor||0),0);
+    const totalRep = atends.reduce((s,a)=>s+U.calcRepasse(a),0);
+    auto = { valorBase:0, valorEstacionamento:0, qtdHorasExtras:0, valorHorasExtras:0, totalAtendimentos:totalAtend, totalRepasse:totalRep, totalAuto:totalRep };
+  }
+  const totalPagar = c.valorOverride != null ? c.valorOverride : auto.totalAuto;
+  return { ...c, ...auto, totalPagar };
+}
+
+// Receita só é reconhecida quando a cobrança do profissional naquele mês foi marcada como PAGA
+// (botão "Marcar Pago" na Cobrança). Não projeta/"inventa" receita a partir do contrato.
+function getReceitaPagaCobranca(p, yr, mo) {
+  const c = getCobranca(p, yr, mo);
+  return c.boletoPago ? c.totalPagar : 0;
+}
+
 // Consolida todas as fontes de receita do mês (sublocação, porcentagem, por cliente, por hora
 // e lançamentos manuais de "outras receitas"). Usado tanto na página de Receitas quanto no Balancete.
 function calcReceitasMes(yr, mo) {
-  const atends = DB.get('atendimentos').filter(a => { const d=U.parseISODate(a.data); return d && d.getFullYear()===yr && d.getMonth()+1===mo; });
-  let rPorcentagem = 0, rCliente = 0, rHora = 0;
-  atends.forEach(a => {
-    const p = DB.getOne('profissionais', a.profissionalId);
-    if (!p) return;
-    const rep = U.calcRepasse(a);
-    if (p.regime === 'porcentagem') rPorcentagem += rep;
-    else if (p.regime === 'cliente') rCliente += rep;
-    else if (p.regime === 'hora') rHora += rep;
+  let rSubl = 0, rPorcentagem = 0, rCliente = 0, rHora = 0;
+  DB.get('profissionais').forEach(p => {
+    const valor = getReceitaPagaCobranca(p, yr, mo);
+    if (!valor) return;
+    if (['sublocacao','turno'].includes(p.regime)) rSubl += valor;
+    else if (p.regime === 'porcentagem') rPorcentagem += valor;
+    else if (p.regime === 'cliente') rCliente += valor;
+    else if (p.regime === 'hora') rHora += valor;
   });
-  const rSubl = getSublocacaoRevenue(yr, mo);
   const rOutras = getReceitasMonth(yr, mo).reduce((s,r) => s+(r.valor||0), 0);
   return { rSubl, rPorcentagem, rCliente, rHora, rOutras, totalReceita: rSubl+rPorcentagem+rCliente+rHora+rOutras };
 }
@@ -299,16 +298,15 @@ function getManualSaldoBanco(yr, mo) {
   return getReceitasMonth(yr, mo).filter(r=>r.categoria==='saldo_banco').reduce((s,r)=>s+(r.valor||0),0);
 }
 
-// Existe algum lançamento (atendimento/despesa/receita/contrato de sublocação) datado antes
-// do início deste mês? Usado para achar o mês "gênese" a partir do qual o saldo bancário
-// anterior passa a ser importado automaticamente do resultado do mês anterior.
+// Existe algum lançamento financeiro real (despesa, receita manual ou cobrança PAGA) datado
+// antes deste mês? Usado para achar o mês "gênese" a partir do qual o saldo bancário anterior
+// passa a ser importado automaticamente do resultado do mês anterior.
 function hasDataBeforeMonth(yr, mo) {
-  const cutoff = new Date(yr, mo-1, 1);
-  const before = (iso) => { const d = U.parseISODate(iso); return d && d < cutoff; };
-  if (DB.get('atendimentos').some(a => before(a.data))) return true;
+  const cutoffKey = yr*100 + mo;
+  const before = (iso) => { const d = U.parseISODate(iso); return d && (d.getFullYear()*100 + d.getMonth()+1) < cutoffKey; };
   if (DB.get('despesas').some(d => before(d.data))) return true;
   if (DB.get('receitas').some(r => before(r.data))) return true;
-  if (DB.get('profissionais').some(p => ['sublocacao','turno'].includes(p.regime) && before(p.dataContrato))) return true;
+  if (DB.get('cobrancas').some(c => c.boletoPago && (c.ano*100 + c.mes) < cutoffKey)) return true;
   return false;
 }
 
@@ -356,6 +354,15 @@ function wireMonthPicker(prefix, state, onNavigate) {
     label.textContent = `${MESES[state.m-1]} ${state.y}`;
     input.value = `${state.y}-${String(state.m).padStart(2,'0')}-01`;
   }
+  // O input fica sobreposto ao rótulo mas com pointer-events:none (ver CSS), então quem
+  // realmente recebe o clique é o rótulo — daqui disparamos a abertura do calendário nativo.
+  label.onclick = () => {
+    if (typeof input.showPicker === 'function') {
+      try { input.showPicker(); return; } catch (e) { /* cai no fallback abaixo */ }
+    }
+    input.focus();
+    input.click();
+  };
   input.onchange = (e) => {
     const [yy, mm] = e.target.value.split('-').map(Number);
     if (!yy || !mm) return;
@@ -396,10 +403,8 @@ function renderDashboard() {
   const desps = DB.get('despesas').filter(d => { const dt=U.parseISODate(d.data); return dt && dt.getFullYear()===y && dt.getMonth()+1===m; });
   const cobrs = DB.get('cobrancas').filter(c => c.ano===y && c.mes===m);
 
-  let receitaAtend = atends.reduce((s,a) => s + U.calcRepasse(a), 0);
-  let receitaSubl = getSublocacaoRevenue(y, m);
-  let receitaOutras = getReceitasMonth(y, m).reduce((s,r) => s+(r.valor||0), 0);
-  let totalReceita = receitaAtend + receitaSubl + receitaOutras;
+  const receitasMes = calcReceitasMes(y, m);
+  let totalReceita = receitasMes.totalReceita;
   let totalDespesa = desps.reduce((s,d) => s + (d.valor||0), 0);
   let resultado = totalReceita - totalDespesa;
   let pendentes = cobrs.filter(c => !c.boletoPago).length;
@@ -439,17 +444,13 @@ function renderDashboard() {
     const dt = new Date(y, m-1-i, 1);
     const yi = dt.getFullYear(), mi = dt.getMonth()+1;
     labels6.push(MESES_SHORT[mi-1]);
-    const ai = DB.get('atendimentos').filter(a => { const d=U.parseISODate(a.data); return d && d.getFullYear()===yi && d.getMonth()+1===mi; });
-    const ri = ai.reduce((s,a) => s+U.calcRepasse(a),0) + getSublocacaoRevenue(yi, mi);
+    const ri = calcReceitasMes(yi, mi).totalReceita;
     const di = DB.get('despesas').filter(d => { const dt2=U.parseISODate(d.data); return dt2 && dt2.getFullYear()===yi && dt2.getMonth()+1===mi; }).reduce((s,d) => s+(d.valor||0),0);
     dataRec6.push(ri); dataDsp6.push(di);
   }
 
   // Receita por tipo
-  const rSubl = receitaSubl;
-  const rPct = atends.filter(a=>{const p=DB.getOne('profissionais',a.profissionalId); return p&&p.regime==='porcentagem';}).reduce((s,a)=>s+U.calcRepasse(a),0);
-  const rCli = atends.filter(a=>{const p=DB.getOne('profissionais',a.profissionalId); return p&&p.regime==='cliente';}).reduce((s,a)=>s+U.calcRepasse(a),0);
-  const rHr = atends.filter(a=>{const p=DB.getOne('profissionais',a.profissionalId); return p&&p.regime==='hora';}).reduce((s,a)=>s+U.calcRepasse(a),0);
+  const { rSubl, rPorcentagem: rPct, rCliente: rCli, rHora: rHr } = receitasMes;
 
   // Recent attendance
   const recentAtends = [...DB.get('atendimentos')].sort((a,b)=>b.data.localeCompare(a.data)).slice(0,5);
@@ -856,15 +857,6 @@ window.saveProf = () => {
   if (!nome) { toast('Nome é obrigatório','error'); return; }
   const regime = g('f-regime')?.value || '';
   if (!regime) { toast('Regime é obrigatório','error'); return; }
-  const prev = id ? DB.getOne('profissionais', id) : null;
-  const novoAtivo = g('f-ativo')?.checked !== false;
-  // Marca a data de desativação automaticamente (para não afetar receita de meses passados
-  // quando o profissional for reativado/desativado depois). Some novamente se reativado.
-  let dataInativacao = prev?.dataInativacao || '';
-  if (prev) {
-    if (prev.ativo && !novoAtivo) dataInativacao = U.isoToday();
-    else if (!prev.ativo && novoAtivo) dataInativacao = '';
-  }
   const base = {
     id: id || U.id(),
     nome,
@@ -882,8 +874,7 @@ window.saveProf = () => {
     diaVencimento: parseInt(g('f-diaVencimento')?.value) || 5,
     usaEstacionamento: g('f-usaEstac')?.checked || false,
     valorEstacionamento: U.parseNum(g('f-valorEstac')?.value || '0'),
-    ativo: novoAtivo,
-    dataInativacao,
+    ativo: g('f-ativo')?.checked !== false,
     obs: g('f-obs')?.value?.trim() || '',
     createdAt: (id && (DB.getOne('profissionais', id) || {}).createdAt) ? DB.getOne('profissionais', id).createdAt : new Date().toISOString()
   };
@@ -1180,33 +1171,9 @@ function renderCobranca() {
   const now = new Date();
   let y = now.getFullYear(), m = now.getMonth()+1;
 
-  function calcCobranca(p) {
-    const mk = U.monthKey(y,m);
-    let existing = DB.get('cobrancas').find(c=>c.profissionalId===p.id && c.mes===m && c.ano===y);
-    if (!existing) return { profissionalId:p.id, mes:m, ano:y, boletoEmitido:null, boletoPago:null, banco:'', obs:'' };
-    return existing;
-  }
-
-  function autoCalc(p) {
-    const atends = DB.get('atendimentos').filter(a=>{ const d=U.parseISODate(a.data); return a.profissionalId===p.id && d && d.getFullYear()===y && d.getMonth()+1===m; });
-    const c = calcCobranca(p);
-    if (['sublocacao','turno'].includes(p.regime)) {
-      const base = p.regime==='sublocacao' ? (p.valorMensal||0) : (p.valorTurno||0);
-      const estac = p.usaEstacionamento ? (p.valorEstacionamento||0) : 0;
-      const he = (c.qtdHorasExtras||0) * (p.valorHoraExtra||50);
-      return { ...c, valorBase:base, valorEstacionamento:estac, qtdHorasExtras:c.qtdHorasExtras||0, valorHorasExtras:he,
-        totalAtendimentos:0, totalRepasse:0, totalPagar:base+estac+he };
-    } else {
-      const totalAtend = atends.reduce((s,a)=>s+(a.valor||0),0);
-      const totalRep = atends.reduce((s,a)=>s+U.calcRepasse(a),0);
-      return { ...c, valorBase:0, valorEstacionamento:0, qtdHorasExtras:0, valorHorasExtras:0,
-        totalAtendimentos:totalAtend, totalRepasse:totalRep, totalPagar:totalRep };
-    }
-  }
-
   function draw() {
     const profs = DB.get('profissionais').filter(p=>p.ativo);
-    const cobrs = profs.map(p=>({prof:p, calc:autoCalc(p)}));
+    const cobrs = profs.map(p=>({prof:p, calc:getCobranca(p, y, m)}));
     const totalPend = cobrs.filter(x=>!x.calc.boletoPago).reduce((s,x)=>s+(x.calc.totalPagar||0),0);
     const totalPago = cobrs.filter(x=>x.calc.boletoPago).reduce((s,x)=>s+(x.calc.totalPagar||0),0);
 
@@ -1241,12 +1208,14 @@ function renderCobranca() {
             `}
           </div>
           <div class="billing-footer">
-            <div style="font-size:18px;font-weight:800;color:var(--primary)">Total: ${U.fmt(c.totalPagar)}</div>
+            <div style="font-size:18px;font-weight:800;color:var(--primary)">Total: ${U.fmt(c.totalPagar)}${c.valorOverride!=null?' <span style="font-size:11px;font-weight:500;color:var(--text-muted)">(valor ajustado)</span>':''}</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               ${['sublocacao','turno'].includes(p.regime)?`<button class="btn btn-sm btn-secondary" onclick='editHorasExtras("${p.id}",${y},${m})'>⏰ H.Extra: ${c.qtdHorasExtras||0}h</button>`:''}
               ${!c.boletoEmitido?`<button class="btn btn-sm btn-outline" onclick='emitirBoleto("${p.id}",${y},${m})'>📄 Emitir Boleto</button>`:''}
               ${c.boletoEmitido&&!c.boletoPago?`<button class="btn btn-sm btn-success" onclick='marcarPago("${p.id}",${y},${m})'>✅ Marcar Pago</button>`:''}
               ${c.boletoPago?`<span style="font-size:12px;color:var(--text-muted)">Pago em ${U.date(c.boletoPago)}</span>`:''}
+              <button class="btn btn-sm btn-secondary" onclick='editValorCobranca("${p.id}",${y},${m})'>💲 Editar Valor</button>
+              ${(c.boletoEmitido||c.boletoPago||c.valorOverride!=null)?`<button class="btn btn-sm btn-danger" onclick='excluirCobranca("${p.id}",${y},${m})'>🗑 Excluir Cobrança</button>`:''}
               <button class="btn btn-sm btn-secondary" onclick='editCobr("${p.id}",${y},${m})'>✏️</button>
             </div>
           </div>
@@ -1325,6 +1294,35 @@ function renderCobranca() {
       obs: document.getElementById('ec-obs').value
     });
     Modal.close(); toast('Cobrança atualizada!','success'); draw();
+  };
+  window.editValorCobranca = (profId, ano, mes) => {
+    const p = DB.getOne('profissionais', profId);
+    const c = getCobranca(p, ano, mes);
+    Modal.open(`💲 Editar Valor da Cobrança — ${p?.nome}`, `
+      <div class="form-group"><label>Valor da Cobrança (R$)</label>
+        <input id="ev-valor" type="number" step="0.01" value="${c.totalPagar}">
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:8px">Valor calculado automaticamente: ${U.fmt(c.totalAuto)}</div>`,
+    `<button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button>
+     <button class="btn btn-secondary" onclick="resetValorCobranca('${profId}',${ano},${mes})">Usar automático</button>
+     <button class="btn btn-primary" onclick="saveValorCobranca('${profId}',${ano},${mes})">Salvar</button>`, 'sm');
+  };
+  window.saveValorCobranca = (profId, ano, mes) => {
+    const valor = U.parseNum(document.getElementById('ev-valor').value);
+    saveCobrancaField(profId, ano, mes, { valorOverride: valor });
+    Modal.close(); toast('Valor da cobrança atualizado!','success'); draw();
+  };
+  window.resetValorCobranca = (profId, ano, mes) => {
+    saveCobrancaField(profId, ano, mes, { valorOverride: null });
+    Modal.close(); toast('Valor voltou ao cálculo automático','success'); draw();
+  };
+  window.excluirCobranca = (profId, ano, mes) => {
+    const p = DB.getOne('profissionais', profId);
+    Modal.confirm(`Excluir a cobrança de <strong>${U.escHtml(p?.nome)}</strong> deste mês? Ela deixa de contar como receita e volta ao estado pendente.`, () => {
+      const list = DB.get('cobrancas').filter(c => !(c.profissionalId===profId && c.ano===ano && c.mes===mes));
+      DB.set('cobrancas', list);
+      toast('Cobrança excluída', 'warning'); draw();
+    });
   };
 
   function saveCobrancaField(profId, ano, mes, fields) {
