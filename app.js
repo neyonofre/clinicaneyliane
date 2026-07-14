@@ -534,11 +534,13 @@ function renderDashboard() {
             const pillsHtml = TURNOS_NAMES.map(t => {
               const ps = occGrid[s][d][t];
               const isOccupied = ps.length > 0;
-              const title = isOccupied ? t + '\\n' + ps.map(p=>p.nome).join('\\n') : t + ' - Livre';
+              const title = isOccupied ? t + '\n' + ps.map(p=>p.nome).join('\n') : t + ' - Livre';
               const bg = ps.length > 1 ? '#8a5a7a' : isOccupied ? 'var(--danger)' : 'rgba(111,143,91,0.15)';
               const bcol = ps.length > 1 ? '#8a5a7a' : isOccupied ? 'var(--danger)' : 'rgba(111,143,91,0.4)';
               const col = isOccupied ? '#fff' : 'var(--text-muted)';
-              return `<span title="${U.escHtml(title)}" style="display:inline-block;width:22px;height:22px;line-height:20px;text-align:center;border-radius:4px;background:${bg};color:${col};border:1px solid ${bcol};font-size:10px;font-weight:bold;cursor:help">${t[0]}</span>`;
+              const cursor = isOccupied ? 'pointer' : 'help';
+              const onclick = isOccupied ? ` onclick='showOccCell("${s}","${d}","${t}")'` : '';
+              return `<span title="${U.escHtml(title)}" style="display:inline-block;width:22px;height:22px;line-height:20px;text-align:center;border-radius:4px;background:${bg};color:${col};border:1px solid ${bcol};font-size:10px;font-weight:bold;cursor:${cursor}"${onclick}>${t[0]}</span>`;
             }).join('<span style="width:4px;display:inline-block"></span>');
             return `<td style="padding:8px;border:1px solid var(--border);white-space:nowrap">${pillsHtml}</td>`;
           }).join('')}
@@ -637,10 +639,10 @@ function renderDashboard() {
       </div>
     </div>`;
 
-  window.showOccCell = (dia, turno) => {
-    const ps = occGrid[dia]?.[turno] || [];
+  window.showOccCell = (sala, dia, turno) => {
+    const ps = occGrid[sala]?.[dia]?.[turno] || [];
     if (!ps.length) return;
-    Modal.open(`${dia} — ${turno}`,
+    Modal.open(`${sala} — ${dia} — ${turno}`,
       `<div style="display:grid;gap:10px">${ps.map(p=>`
         <div class="list-item">
           <div class="avatar">${U.initials(p.nome)}</div>
