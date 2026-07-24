@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "prontuario-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/raphael/Prontuario Clinica Neyliane", "run", "dev"],
+      "port": 3000,
+      "autoPort": true
+    },
+    {
+      "name": "gestao-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-l", "5050", "/Users/raphael/Documents/Medprompt.ia/Clinica Neyliane Onofre"],
+      "port": 5050,
+      "autoPort": true
+    }
+  ]
+}

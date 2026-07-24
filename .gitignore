@@ -11,3 +11,7 @@ firebase-debug.log
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Node / JS
+node_modules/
+.env

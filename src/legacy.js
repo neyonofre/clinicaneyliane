@@ -1,15 +1,15 @@
 /* ===== CONSTANTS ===== */
-const REGIMES = {
+window.REGIMES = {
   sublocacao: 'Sublocação Mensal',
   turno: 'Aluguel por Turno',
   hora: 'Aluguel por Hora',
   porcentagem: 'Porcentagem por Paciente',
   cliente: 'Valor por Cliente'
 };
-const TURNOS_LIST = ['Manhã','Tarde','Noite'];
-const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-const MESES_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-const CATS_DESPESA = {
+window.TURNOS_LIST = ['Manhã','Tarde','Noite'];
+window.MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+window.MESES_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+window.CATS_DESPESA = {
   '2': 'Despesas com Pessoal',
   '2.1': 'Salários mensal', '2.2': '13º salário', '2.3': 'FGTS', '2.4': 'INSS',
   '2.5': 'Contabilidade', '2.6': 'Faxineiro', '2.7': 'Outros (Pessoal)',
@@ -22,7 +22,7 @@ const CATS_DESPESA = {
   '4.4': 'Lanches e Buffet', '4.5': 'Manutenção (Mão de Obra)', '4.6': 'Manutenção (Material)',
   '4.7': 'Descartáveis', '4.8': 'Reformas', '4.9': 'Propaganda e Marketing', '4.10': 'Outros (Variáveis)'
 };
-const SUBCATS = [
+window.SUBCATS = [
   { k:'2.1',l:'Salários mensal',g:'2' }, { k:'2.2',l:'13º salário',g:'2' }, { k:'2.3',l:'FGTS',g:'2' },
   { k:'2.4',l:'INSS',g:'2' }, { k:'2.5',l:'Contabilidade',g:'2' }, { k:'2.6',l:'Faxineiro',g:'2' }, { k:'2.7',l:'Outros (Pessoal)',g:'2' },
   { k:'3.1.1',l:'Condomínio Consultório',g:'3' }, { k:'3.1.2',l:'Condomínio Garagens',g:'3' }, { k:'3.2',l:'Aluguel',g:'3' },
@@ -33,10 +33,10 @@ const SUBCATS = [
   { k:'4.7',l:'Descartáveis',g:'4' }, { k:'4.8',l:'Reformas',g:'4' }, { k:'4.9',l:'Propaganda e Marketing',g:'4' }, { k:'4.10',l:'Outros (Variáveis)',g:'4' }
 ];
 
-const SALAS = ['Sala 1','Sala 2','Sala 3 (Infantil)','Sala 4','Sala 5','Mini Auditório'];
-const DIAS_SEMANA_WORK = ['Seg','Ter','Qua','Qui','Sex','Sáb'];
-const TURNOS_NAMES = ['Manhã','Tarde','Noite'];
-const CATS_RECEITA = [
+window.SALAS = ['Sala 1','Sala 2','Sala 3 (Infantil)','Sala 4','Sala 5','Mini Auditório'];
+window.DIAS_SEMANA_WORK = ['Seg','Ter','Qua','Qui','Sex','Sáb'];
+window.TURNOS_NAMES = ['Manhã','Tarde','Noite'];
+window.CATS_RECEITA = [
   { k:'saldo_banco', l:'Saldo Anterior — Banco' },
   { k:'saldo_caixa', l:'Saldo Anterior — Caixa' },
   { k:'saldo_aplic', l:'Saldo Anterior — Aplicações Financeiras' },
@@ -46,7 +46,7 @@ const CATS_RECEITA = [
 ];
 
 /* ===== INITIAL DATA ===== */
-const INITIAL_PROFISSIONAIS = [
+window.INITIAL_PROFISSIONAIS = [
   // SUBLOCAÇÃO
   { id:'p1', nome:'Adadja Aragão Correia Farias', cpf:'803.462.193-53', profissao:'Fonoaudióloga', especialidade:'Fonoaudiologia', conselho:'CRFa 8044-8', celular:'85 99754-7540', whatsapp:'85 99754-7540', email:'fgaadadja@gmail.com', endereco:'Rua José Cavalcante Sobrinho, 120 - Coaçu', dataContrato:'2026-01-01', regime:'sublocacao', valorMensal:600, valorEstacionamento:80, usaEstacionamento:true, valorHoraExtra:50, diaVencimento:1, ativo:true, obs:'' },
   { id:'p2', nome:'Andyslene Freitas Fernandes', cpf:'604.141.443-33', profissao:'Psicóloga', especialidade:'Psicologia', conselho:'CRP 11/11693', celular:'85 98582-4247', whatsapp:'85 98582-4247', email:'andyslenefernandes@yahoo.com.br', endereco:'Rua Tavares Coutinho, 1890 - Varjota', dataContrato:'2025-02-15', regime:'sublocacao', valorMensal:450, valorEstacionamento:0, usaEstacionamento:false, valorHoraExtra:50, diaVencimento:15, ativo:true, obs:'' },
@@ -80,7 +80,7 @@ const INITIAL_PROFISSIONAIS = [
 /* ===== FIREBASE CONFIG ===== */
 // Preencha com os dados do seu projeto Firebase APÓS criá-lo no Console:
 // console.firebase.google.com → Adicionar App (Web) → Configuração do SDK
-const FIREBASE_CONFIG = {
+window.FIREBASE_CONFIG = {
   apiKey:            "AIzaSyCn0ElKEW7ZDIlTbYdgZ0KUgLaaJWE1bdM",
   authDomain:        "clinicaneyliane.firebaseapp.com",
   projectId:         "clinicaneyliane",
@@ -91,19 +91,19 @@ const FIREBASE_CONFIG = {
 };
 
 /* ===== SESSION (auditoria: quem está logado) ===== */
-const Session = { email: null };
-function currentUser() { return Session.email || 'Operador local'; }
+window.Session = { email: null };
+window.currentUser = function currentUser() { return Session.email || 'Operador local'; }
 
 /* ===== DATABASE ===== */
-const DB_TABLES = ['profissionais','pacientes','atendimentos','despesas','cobrancas','cobrancas_excluidas','receitas','custom_subcats','custom_rec_cats'];
+window.DB_TABLES = ['profissionais','pacientes','atendimentos','despesas','cobrancas','cobrancas_excluidas','receitas','custom_subcats','custom_rec_cats'];
 
 // pacientes e atendimentos vivem em coleções Firestore reais (1 documento por registro),
 // compartilhadas com o Prontuário — em vez do padrão antigo de "array dentro de 1 doc"
 // usado pelas demais tabelas. Isso permite escrita concorrente das duas aplicações
 // sem uma sobrescrever a mudança da outra.
-const SHARED_COLLECTIONS = ['pacientes', 'atendimentos'];
+window.SHARED_COLLECTIONS = ['pacientes', 'atendimentos'];
 
-const DB = {
+window.DB = window.DB || {
   _cache: {},
   _fs: null,
   _useFirebase: false,
@@ -200,7 +200,7 @@ const DB = {
 };
 
 /* ===== UTILITIES ===== */
-const U = {
+window.U = window.U || {
   id: () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
   fmt: (n) => {
     if (n == null || isNaN(n)) return 'R$ 0,00';
@@ -246,7 +246,7 @@ const U = {
 };
 
 /* ===== TOAST ===== */
-function toast(msg, type='info') {
+window.toast = window.toast || function toast(msg, type='info') {
   const c = document.getElementById('toast-container');
   const t = document.createElement('div');
   const icons = { success:'<span class="msi">check_circle</span>', error:'<span class="msi">error</span>', warning:'<span class="msi">warning</span>', info:'<span class="msi">info</span>' };
@@ -257,7 +257,7 @@ function toast(msg, type='info') {
 }
 
 /* ===== MODAL ===== */
-const Modal = {
+window.Modal = window.Modal || {
   el: null, overlay: null,
   init() {
     this.overlay = document.getElementById('modal-overlay');
@@ -284,6 +284,7 @@ const Modal = {
 /* ===== PAGE STATE (persists currently-viewed month/filters across re-renders) ===== */
 const _now0 = new Date();
 const PageState = {
+  dashboard: { y: _now0.getFullYear(), m: _now0.getMonth()+1 },
   atendimentos: { y: _now0.getFullYear(), m: _now0.getMonth()+1, filterProf: '' },
   despesas: { y: _now0.getFullYear(), m: _now0.getMonth()+1, filterCat: '' },
   receitas: { y: _now0.getFullYear(), m: _now0.getMonth()+1 },
@@ -291,10 +292,10 @@ const PageState = {
 };
 
 /* ===== HELPERS ===== */
-function getAllSubcats() {
+window.getAllSubcats = window.getAllSubcats || function getAllSubcats() {
   return [...SUBCATS, ...DB.get('custom_subcats')];
 }
-function getAllRecCats() {
+window.getAllRecCats = window.getAllRecCats || function getAllRecCats() {
   return [...CATS_RECEITA, ...DB.get('custom_rec_cats')];
 }
 function getReceitasMonth(yr, mo) {
@@ -435,7 +436,7 @@ function wireMonthPicker(prefix, state, onNavigate) {
 }
 
 /* ===== ROUTER ===== */
-const Router = {
+window.Router = window.Router || {
   current: 'dashboard',
   pages: {
     dashboard: { title:'Dashboard', render: renderDashboard },
@@ -458,8 +459,8 @@ const Router = {
 
 /* ===== DASHBOARD ===== */
 function renderDashboard() {
-  const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth()+1;
+  const state = PageState.dashboard;
+  const y = state.y, m = state.m;
   const atends = DB.get('atendimentos').filter(a => { const d=U.parseISODate(a.data); return d && d.getFullYear()===y && d.getMonth()+1===m; });
   const desps = DB.get('despesas').filter(d => { const dt=U.parseISODate(d.data); return dt && dt.getFullYear()===y && dt.getMonth()+1===m; });
   // Só considera cobranças de profissionais atualmente ativos (e já contratados no mês) —
@@ -514,7 +515,7 @@ function renderDashboard() {
   }
 
   // Receita por tipo
-  const { rSubl, rPorcentagem: rPct, rCliente: rCli, rHora: rHr } = receitasMes;
+  const { rSubl, rPorcentagem: rPct, rCliente: rCli, rHora: rHr, rOutras } = receitasMes;
 
   // Recent attendance
   const recentAtends = [...DB.get('atendimentos')].sort((a,b)=>b.data.localeCompare(a.data)).slice(0,5);
@@ -595,7 +596,14 @@ function renderDashboard() {
         <div class="chart-container"><canvas id="chart-evolucao"></canvas></div>
       </div>
       <div class="card">
-        <div class="card-title">Receita por Tipo <span>${MESES[m-1]}</span></div>
+        <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>Receita por Tipo</span>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button onclick="dashNavMes(-1)" style="border:none;background:none;cursor:pointer;font-size:16px;color:var(--text)">‹</button>
+            <input type="month" value="${y}-${String(m).padStart(2,'0')}" onchange="dashSetMonth(this.value)" style="border:1px solid var(--border); border-radius:4px; padding:2px 4px; font-family:inherit; color:var(--text); background:var(--surface);" />
+            <button onclick="dashNavMes(1)" style="border:none;background:none;cursor:pointer;font-size:16px;color:var(--text)">›</button>
+          </div>
+        </div>
         <div class="chart-container"><canvas id="chart-tipos"></canvas></div>
       </div>
     </div>
@@ -661,6 +669,11 @@ function renderDashboard() {
     const gridColor = isDark ? '#3a2f20' : '#e7dcc7';
     const textColor = isDark ? '#a99b80' : '#8a7c65';
 
+    let cEvol = Chart.getChart('chart-evolucao');
+    if (cEvol) cEvol.destroy();
+    let cTipos = Chart.getChart('chart-tipos');
+    if (cTipos) cTipos.destroy();
+
     new Chart(document.getElementById('chart-evolucao'), {
       type:'bar',
       data:{ labels:labels6,
@@ -673,16 +686,35 @@ function renderDashboard() {
         scales:{ x:{ grid:{color:gridColor}, ticks:{color:textColor} }, y:{ grid:{color:gridColor}, ticks:{color:textColor, callback:v=>U.fmtShort(v)} } } }
     });
 
-    const pieData = [rSubl, rPct, rCli, rHr].filter(v=>v>0);
-    const pieLabels = ['Sublocação','Porcentagem','Por Cliente','Por Hora'].filter((_,i)=>[rSubl,rPct,rCli,rHr][i]>0);
+    const pieData = [rSubl, rPct, rCli, rHr, rOutras].filter(v=>v>0);
+    const pieLabels = ['Sublocação','Porcentagem','Por Cliente','Por Hora','Outras'].filter((_,i)=>[rSubl,rPct,rCli,rHr,rOutras][i]>0);
     new Chart(document.getElementById('chart-tipos'), {
       type:'doughnut',
-      data:{ labels:pieLabels, datasets:[{ data:pieData, backgroundColor:['#a3794f','#6f8f5b','#c08a3e','#5f8a86'], borderWidth:2, borderColor:'var(--surface)' }]},
+      data:{ labels:pieLabels, datasets:[{ data:pieData, backgroundColor:['#a3794f','#6f8f5b','#c08a3e','#5f8a86','#8a7c65'], borderWidth:2, borderColor:'var(--surface)' }]},
       options:{ responsive:true, maintainAspectRatio:false,
         plugins:{ legend:{ position:'bottom', labels:{ color:textColor, boxWidth:12, padding:10 } } } }
     });
   });
 }
+
+// Global functions for Dashboard Navigation
+window.dashNavMes = function(dir) {
+  let { m, y } = PageState.dashboard;
+  m += dir;
+  if (m < 1) { m = 12; y--; }
+  if (m > 12) { m = 1; y++; }
+  PageState.dashboard.m = m;
+  PageState.dashboard.y = y;
+  if (window.renderDashboard) window.renderDashboard();
+};
+
+window.dashSetMonth = function(val) {
+  if (!val) return;
+  const [yy, mm] = val.split('-');
+  PageState.dashboard.y = parseInt(yy, 10);
+  PageState.dashboard.m = parseInt(mm, 10);
+  if (window.renderDashboard) window.renderDashboard();
+};
 
 /* ===== PROFISSIONAIS ===== */
 function renderProfissionais() {
@@ -2004,73 +2036,60 @@ function showLoginOverlay(resolve) {
   document.getElementById('login-pwd').onkeydown = (e) => { if (e.key === 'Enter') window.doLogin(); };
 }
 
-async function init() {
-  Modal.init();
+window.legacyInit = async function() { await DB.init(() => Router.go(Router.current)); Router.go('dashboard'); };
 
-  const savedTheme = localStorage.getItem('clinica_theme') || 'light';
-  document.documentElement.dataset.theme = savedTheme;
-  updateThemeBtn(savedTheme);
+// Expondo globalmente para os onclicks e para o main.js
+window.getReceitasMonth = getReceitasMonth;
+window.contratoIniciadoNoMes = contratoIniciadoNoMes;
+window.getCobranca = getCobranca;
+window.getReceitaPagaCobranca = getReceitaPagaCobranca;
+window.calcReceitasMes = calcReceitasMes;
+window.getManualSaldoBanco = getManualSaldoBanco;
+window.hasDataBeforeMonth = hasDataBeforeMonth;
+window.getSaldoAnteriorBanco = getSaldoAnteriorBanco;
+window.calcMonth = calcMonth;
+window.wireMonthPicker = wireMonthPicker;
+window.renderDashboard = renderDashboard;
+window.renderProfissionais = renderProfissionais;
+window.renderPacientes = renderPacientes;
+window.renderAtendimentos = renderAtendimentos;
+window.renderCobranca = renderCobranca;
+window.renderDespesas = renderDespesas;
+window.renderReceitas = renderReceitas;
+window.renderBalancete = renderBalancete;
+window.updateThemeBtn = updateThemeBtn;
+window.showLoginOverlay = showLoginOverlay;
 
-  document.getElementById('theme-toggle').onclick = () => {
-    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.dataset.theme = next;
-    localStorage.setItem('clinica_theme', next);
-    updateThemeBtn(next);
-    if (Router.current === 'dashboard') renderDashboard();
-  };
-
-  document.querySelectorAll('.nav-item').forEach(el => {
-    el.onclick = () => Router.go(el.dataset.page);
-  });
-
-  document.getElementById('menu-toggle').onclick = () => {
-    const s = document.getElementById('sidebar');
-    s.classList.toggle('mobile-open');
-    s.classList.toggle('collapsed');
-  };
-
-  const now = new Date();
-  document.getElementById('current-date').textContent = now.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
-
-  // Firebase setup (only if credentials are filled in)
-  const configured = FIREBASE_CONFIG.apiKey !== 'PREENCHER';
-  if (configured && typeof firebase !== 'undefined') {
-    try {
-      if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
-      DB._fs = firebase.firestore();
-      DB._useFirebase = true;
-      // Wait for auth state (prompts login if not authenticated)
-      const user = await new Promise(resolve => {
-        firebase.auth().onAuthStateChanged(user => {
-          if (user) resolve(user);
-          else showLoginOverlay(resolve);
-        });
-      });
-      Session.email = user?.email || null;
-      // Show logout button
-      const logoutBtn = document.getElementById('btn-logout');
-      logoutBtn.style.display = 'flex';
-      logoutBtn.onclick = () => Modal.confirm('Sair do sistema?', () => {
-        firebase.auth().signOut().then(() => location.reload());
-      });
-    } catch(e) {
-      console.warn('Firebase indisponível, usando armazenamento local:', e);
-      DB._useFirebase = false;
-    }
-  }
-
-  // Show loading while data is fetched
-  const loading = document.getElementById('app-loading');
-  const appEl = document.getElementById('app');
-  loading.style.display = 'flex';
-  appEl.style.visibility = 'hidden';
-
-  await DB.init();
-
-  loading.style.display = 'none';
-  appEl.style.visibility = 'visible';
-
-  Router.go('dashboard');
-}
-
-document.addEventListener('DOMContentLoaded', init);
+// Expondo TODAS globalmente
+if (typeof currentUser === "function") window.currentUser = currentUser;
+if (typeof toast === "function") window.toast = toast;
+if (typeof getAllSubcats === "function") window.getAllSubcats = getAllSubcats;
+if (typeof getAllRecCats === "function") window.getAllRecCats = getAllRecCats;
+if (typeof getReceitasMonth === "function") window.getReceitasMonth = getReceitasMonth;
+if (typeof contratoIniciadoNoMes === "function") window.contratoIniciadoNoMes = contratoIniciadoNoMes;
+if (typeof getCobranca === "function") window.getCobranca = getCobranca;
+if (typeof getReceitaPagaCobranca === "function") window.getReceitaPagaCobranca = getReceitaPagaCobranca;
+if (typeof calcReceitasMes === "function") window.calcReceitasMes = calcReceitasMes;
+if (typeof getManualSaldoBanco === "function") window.getManualSaldoBanco = getManualSaldoBanco;
+if (typeof hasDataBeforeMonth === "function") window.hasDataBeforeMonth = hasDataBeforeMonth;
+if (typeof getSaldoAnteriorBanco === "function") window.getSaldoAnteriorBanco = getSaldoAnteriorBanco;
+if (typeof calcMonth === "function") window.calcMonth = calcMonth;
+if (typeof wireMonthPicker === "function") window.wireMonthPicker = wireMonthPicker;
+if (typeof sync === "function") window.sync = sync;
+if (typeof renderDashboard === "function") window.renderDashboard = renderDashboard;
+if (typeof renderProfissionais === "function") window.renderProfissionais = renderProfissionais;
+if (typeof draw === "function") window.draw = draw;
+if (typeof regimedesc === "function") window.regimedesc = regimedesc;
+if (typeof renderPacientes === "function") window.renderPacientes = renderPacientes;
+if (typeof renderAtendimentos === "function") window.renderAtendimentos = renderAtendimentos;
+if (typeof renderCobranca === "function") window.renderCobranca = renderCobranca;
+if (typeof saveCobrancaField === "function") window.saveCobrancaField = saveCobrancaField;
+if (typeof renderDespesas === "function") window.renderDespesas = renderDespesas;
+if (typeof drawCatList === "function") window.drawCatList = drawCatList;
+if (typeof drawRecCatList === "function") window.drawRecCatList = drawRecCatList;
+if (typeof renderReceitas === "function") window.renderReceitas = renderReceitas;
+if (typeof renderBalancete === "function") window.renderBalancete = renderBalancete;
+if (typeof drawMensal === "function") window.drawMensal = drawMensal;
+if (typeof drawAnual === "function") window.drawAnual = drawAnual;
+if (typeof updateThemeBtn === "function") window.updateThemeBtn = updateThemeBtn;
+if (typeof showLoginOverlay === "function") window.showLoginOverlay = showLoginOverlay;
