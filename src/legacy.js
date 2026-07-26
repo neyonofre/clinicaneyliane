@@ -340,8 +340,18 @@ function getReceitaPagaCobranca(p, yr, mo) {
   return c.boletoPago ? c.totalPagar : 0;
 }
 
+// Categorias de "Saldo Anterior" (banco/caixa/aplicações). NÃO são receita: são o dinheiro
+// que já existia antes do mês começar. Entram só no balanço patrimonial do Balancete, nunca
+// no total de receitas — senão o caixa do mês anterior aparece como se fosse faturamento novo.
+const CATS_SALDO = ['saldo_banco', 'saldo_caixa', 'saldo_aplic'];
+
+function somaReceitasPorCategorias(yr, mo, cats) {
+  return getReceitasMonth(yr, mo).filter(r => cats.includes(r.categoria)).reduce((s,r) => s+(r.valor||0), 0);
+}
+
 // Consolida todas as fontes de receita do mês (sublocação, porcentagem, por cliente, por hora
 // e lançamentos manuais de "outras receitas"). Usado tanto na página de Receitas quanto no Balancete.
+// "rOutras" conta só lançamentos manuais que são receita de verdade — saldos anteriores ficam de fora.
 function calcReceitasMes(yr, mo) {
   let rSubl = 0, rPorcentagem = 0, rCliente = 0, rHora = 0;
   DB.get('profissionais').forEach(p => {
@@ -352,12 +362,14 @@ function calcReceitasMes(yr, mo) {
     else if (p.regime === 'cliente') rCliente += valor;
     else if (p.regime === 'hora') rHora += valor;
   });
-  const rOutras = getReceitasMonth(yr, mo).reduce((s,r) => s+(r.valor||0), 0);
+  const rOutras = getReceitasMonth(yr, mo)
+    .filter(r => !CATS_SALDO.includes(r.categoria))
+    .reduce((s,r) => s+(r.valor||0), 0);
   return { rSubl, rPorcentagem, rCliente, rHora, rOutras, totalReceita: rSubl+rPorcentagem+rCliente+rHora+rOutras };
 }
 
 function getManualSaldoBanco(yr, mo) {
-  return getReceitasMonth(yr, mo).filter(r=>r.categoria==='saldo_banco').reduce((s,r)=>s+(r.valor||0),0);
+  return somaReceitasPorCategorias(yr, mo, ['saldo_banco']);
 }
 
 // Existe algum lançamento financeiro real (despesa, receita manual ou cobrança PAGA) datado
@@ -372,9 +384,10 @@ function hasDataBeforeMonth(yr, mo) {
   return false;
 }
 
-// Saldo Anterior — Banco de um mês = resultado do mês anterior (encadeado recursivamente).
-// No mês "gênese" (sem nenhum lançamento anterior no sistema) usa o valor manual informado
-// em Receitas, que serve como saldo inicial de partida.
+// Saldo Anterior — Banco de um mês = saldo de FECHAMENTO do mês anterior (encadeado
+// recursivamente): saldo que entrou + (receitas − despesas) daquele mês. No mês "gênese"
+// (sem nenhum lançamento anterior no sistema) usa o valor manual informado em Receitas,
+// que serve como saldo inicial de partida.
 function getSaldoAnteriorBanco(yr, mo, cache = {}) {
   const key = yr + '-' + mo;
   if (key in cache) return cache[key];
@@ -384,7 +397,7 @@ function getSaldoAnteriorBanco(yr, mo, cache = {}) {
   } else {
     let pm = mo - 1, py = yr;
     if (pm < 1) { pm = 12; py--; }
-    val = calcMonth(py, pm, cache).resultado;
+    val = calcMonth(py, pm, cache).saldoBancoFinal;
   }
   cache[key] = val;
   return val;
@@ -392,18 +405,28 @@ function getSaldoAnteriorBanco(yr, mo, cache = {}) {
 
 // Cálculo completo do balancete de um mês (receitas por origem, despesas por grupo, resultado).
 // Compartilhado pelas páginas de Receitas e Balancete.
+//
+// Separa dois conceitos que antes estavam misturados num "resultado" só:
+//   - resultado       = receitas − despesas do mês (o quanto o mês gerou de fato)
+//   - saldoBancoFinal = saldo que entrou no mês + resultado (quanto há em banco no fim)
+// O saldo anterior NÃO entra em totalReceita: ele é dinheiro de meses passados, não
+// faturamento. O saldo em banco continua sendo transportado mês a mês exatamente como
+// antes — o que muda é que ele deixa de inflar a receita e o "resultado do mês".
 function calcMonth(yr, mo, cache = {}) {
   const rec = calcReceitasMes(yr, mo);
   const desps = DB.get('despesas').filter(d=>{ const dt=U.parseISODate(d.data); return dt && dt.getFullYear()===yr && dt.getMonth()+1===mo; });
   const saldoBancoAnterior = getSaldoAnteriorBanco(yr, mo, cache);
-  const rOutras = rec.rOutras - getManualSaldoBanco(yr, mo) + saldoBancoAnterior;
-  const totalReceita = rec.rSubl + rec.rPorcentagem + rec.rCliente + rec.rHora + rOutras;
+  const saldoCaixaAnterior = somaReceitasPorCategorias(yr, mo, ['saldo_caixa']);
+  const saldoAplicAnterior = somaReceitasPorCategorias(yr, mo, ['saldo_aplic']);
+  const totalReceita = rec.totalReceita;
   const dPessoal = desps.filter(d=>d.categoria==='2').reduce((s,d)=>s+(d.valor||0),0);
   const dFixas = desps.filter(d=>d.categoria==='3').reduce((s,d)=>s+(d.valor||0),0);
   const dVariaveis = desps.filter(d=>d.categoria==='4').reduce((s,d)=>s+(d.valor||0),0);
   const totalDespesa = dPessoal + dFixas + dVariaveis;
-  return { rSubl:rec.rSubl, rPorcentagem:rec.rPorcentagem, rCliente:rec.rCliente, rHora:rec.rHora, rOutras, saldoBancoAnterior,
-    totalReceita, dPessoal, dFixas, dVariaveis, totalDespesa, resultado: totalReceita - totalDespesa };
+  const resultado = totalReceita - totalDespesa;
+  return { rSubl:rec.rSubl, rPorcentagem:rec.rPorcentagem, rCliente:rec.rCliente, rHora:rec.rHora, rOutras:rec.rOutras,
+    saldoBancoAnterior, saldoCaixaAnterior, saldoAplicAnterior, saldoBancoFinal: saldoBancoAnterior + resultado,
+    totalReceita, dPessoal, dFixas, dVariaveis, totalDespesa, resultado };
 }
 
 // Abre um seletor de data nativo (dias/meses/anos) ancorado no rótulo do mês de uma página,
@@ -1736,16 +1759,17 @@ function renderReceitas() {
     const { y, m } = state;
     const c = calcMonth(y, m);
     const list = getReceitasMonth(y, m).sort((a,b)=>b.data.localeCompare(a.data));
-    const total = list.reduce((s,r)=>s+(r.valor||0),0);
-    const outrasManuais = c.rOutras - c.saldoBancoAnterior;
+    // Saldos anteriores ficam fora do total de receita — são caixa de meses passados,
+    // não faturamento do mês (aparecem só no Balancete). Ver CATS_SALDO/calcMonth.
+    const totalReceitaManual = list.filter(r=>!CATS_SALDO.includes(r.categoria)).reduce((s,r)=>s+(r.valor||0),0);
+    const totalSaldos = list.filter(r=>CATS_SALDO.includes(r.categoria)).reduce((s,r)=>s+(r.valor||0),0);
 
     const resumoRows = [
-      ['Saldo Anterior — Banco (transportado do mês anterior)', c.saldoBancoAnterior],
       ['Aluguel de Salas (Sublocação/Turno)', c.rSubl],
       ['Porcentagem sobre Consultas', c.rPorcentagem],
       ['Repasse por Cliente (Fixo)', c.rCliente],
       ['Repasse por Hora', c.rHora],
-      ['Outras Receitas (lançamentos manuais)', outrasManuais]
+      ['Outras Receitas (lançamentos manuais)', c.rOutras]
     ].filter(([,v]) => v);
 
     document.getElementById('rec-resumo').innerHTML = `
@@ -1761,22 +1785,26 @@ function renderReceitas() {
 
     document.getElementById('rec-list').innerHTML = `
       <div class="stat-row">
-        <div class="stat-chip">Total lançamentos manuais: <strong style="color:var(--success)">${U.fmt(total)}</strong></div>
+        <div class="stat-chip">Receitas manuais: <strong style="color:var(--success)">${U.fmt(totalReceitaManual)}</strong></div>
+        ${totalSaldos ? `<div class="stat-chip" title="Saldo que já existia antes do mês — entra só no Balancete, não conta como receita">Saldos anteriores (não é receita): <strong>${U.fmt(totalSaldos)}</strong></div>` : ''}
         <div class="stat-chip">Registros: <strong>${list.length}</strong></div>
       </div>
       ${list.length ? `<div class="table-wrap"><table>
         <thead><tr><th>Data</th><th>Categoria</th><th>Descrição</th><th>Forma Pag.</th><th style="text-align:right">Valor</th><th style="text-align:right">Ações</th></tr></thead>
-        <tbody>${list.map(r=>`
-          <tr title="${r.criadoPor?`Lançado por ${U.escHtml(r.criadoPor)}`:''}">
+        <tbody>${list.map(r=>{
+          const ehSaldo = CATS_SALDO.includes(r.categoria);
+          return `
+          <tr title="${ehSaldo?'Saldo anterior — não entra no total de receitas, aparece no Balancete. ':''}${r.criadoPor?`Lançado por ${U.escHtml(r.criadoPor)}`:''}">
             <td>${U.date(r.data)}</td>
-            <td><span class="badge badge-success" style="font-size:11px">${U.escHtml(getAllRecCats().find(c=>c.k===r.categoria)?.l||r.categoria)}</span></td>
+            <td><span class="badge ${ehSaldo?'badge-gray':'badge-success'}" style="font-size:11px">${U.escHtml(getAllRecCats().find(c=>c.k===r.categoria)?.l||r.categoria)}</span></td>
             <td>${U.escHtml(r.descricao||'—')}</td>
             <td>${U.escHtml(r.formaPagamento||'—')}</td>
-            <td style="text-align:right;font-weight:600;color:var(--success)">${U.fmt(r.valor)}</td>
+            <td style="text-align:right;font-weight:600;color:${ehSaldo?'var(--text-muted)':'var(--success)'}">${U.fmt(r.valor)}</td>
             <td><div class="td-actions"><button class="action-btn edit" onclick='editReceita("${r.id}")'><span class="msi">edit</span></button><button class="action-btn delete" onclick='delReceita("${r.id}")'><span class="msi">delete</span></button></div></td>
-          </tr>`).join('')}
-          <tr style="background:var(--surface-2)"><td colspan="4" style="font-weight:700;padding:10px 14px">TOTAL</td><td style="text-align:right;font-weight:800;color:var(--success);padding:10px 14px">${U.fmt(total)}</td><td></td></tr>
-        </tbody></table></div>` : '<div class="empty-state"><div class="empty-icon"><span class="msi">payments</span></div><h3>Nenhum lançamento manual neste mês</h3><p>Registre entradas como aluguel de auditório, garagens, saldo anterior etc.</p></div>'}`;
+          </tr>`;
+        }).join('')}
+          <tr style="background:var(--surface-2)"><td colspan="4" style="font-weight:700;padding:10px 14px">TOTAL EM RECEITAS${totalSaldos?' (sem os saldos anteriores)':''}</td><td style="text-align:right;font-weight:800;color:var(--success);padding:10px 14px">${U.fmt(totalReceitaManual)}</td><td></td></tr>
+        </tbody></table></div>` : '<div class="empty-state"><div class="empty-icon"><span class="msi">payments</span></div><h3>Nenhum lançamento manual neste mês</h3><p>Registre entradas como aluguel de auditório, garagens etc.</p></div>'}`;
   }
 
   document.getElementById('content').innerHTML = `
@@ -1865,17 +1893,14 @@ function renderBalancete() {
     const customRecCats = DB.get('custom_rec_cats');
     const rows = [
       ['1 — RECEITAS', null, true],
-      ['1.1 Saldo Anterior — Banco (mês anterior)', c.saldoBancoAnterior],
-      ['1.2 Saldo Anterior — Caixa', recBycat['saldo_caixa']||0],
-      ['1.3 Saldo Anterior — Aplicações', recBycat['saldo_aplic']||0],
-      ['1.4 Aluguel de Salas (Sublocação)', c.rSubl],
-      ['1.5 Aluguel por Porcentagem', c.rPorcentagem],
-      ['1.6 Repasse por Cliente (Fixo)', c.rCliente],
-      ['1.7 Repasse por Hora', c.rHora],
-      ['1.8 Aluguel de Auditório', recBycat['aluguel_auditorio']||0],
-      ['1.9 Garagens', recBycat['garagem']||0],
-      ['1.10 Outros', recBycat['outros_rec']||0],
-      ...customRecCats.map((cat, i) => [`1.${11+i} ${cat.l}`, recBycat[cat.k]||0]),
+      ['1.1 Aluguel de Salas (Sublocação)', c.rSubl],
+      ['1.2 Aluguel por Porcentagem', c.rPorcentagem],
+      ['1.3 Repasse por Cliente (Fixo)', c.rCliente],
+      ['1.4 Repasse por Hora', c.rHora],
+      ['1.5 Aluguel de Auditório', recBycat['aluguel_auditorio']||0],
+      ['1.6 Garagens', recBycat['garagem']||0],
+      ['1.7 Outros', recBycat['outros_rec']||0],
+      ...customRecCats.map((cat, i) => [`1.${8+i} ${cat.l}`, recBycat[cat.k]||0]),
       ['TOTAL RECEITAS', c.totalReceita, true, 'var(--success)'],
       ['', null],
       ['2 — DESPESAS COM PESSOAL', null, true],
@@ -1900,7 +1925,16 @@ function renderBalancete() {
       ['Subtotal Variáveis', c.dVariaveis, false, null, true],
       ['', null],
       ['TOTAL DESPESAS', c.totalDespesa, true, 'var(--danger)'],
-      ['RESULTADO DO MÊS', c.resultado, true, c.resultado>=0?'var(--success)':'var(--danger)'],
+      ['RESULTADO DO MÊS (receitas − despesas)', c.resultado, true, c.resultado>=0?'var(--success)':'var(--danger)'],
+      ['', null],
+      // Posição de caixa — não é receita nem despesa: mostra de quanto o banco partiu,
+      // quanto o mês variou (o resultado acima) e onde fechou.
+      ['5 — SALDOS (posição de caixa)', null, true],
+      ['5.1 Saldo Anterior — Banco (fechamento do mês anterior)', c.saldoBancoAnterior],
+      ['5.2 (+/−) Variação do mês (resultado acima)', c.resultado, false, c.resultado>=0?'var(--success)':'var(--danger)'],
+      ['5.3 (=) Saldo Final — Banco', c.saldoBancoFinal, true, c.saldoBancoFinal>=0?'var(--success)':'var(--danger)'],
+      ...(c.saldoCaixaAnterior ? [['5.4 Saldo Anterior — Caixa', c.saldoCaixaAnterior]] : []),
+      ...(c.saldoAplicAnterior ? [['5.5 Saldo Anterior — Aplicações', c.saldoAplicAnterior]] : []),
     ];
 
     document.getElementById('balancete-content').innerHTML = `
@@ -1933,19 +1967,21 @@ function renderBalancete() {
         <button class="btn btn-secondary btn-sm" onclick="window.print()"><span class="msi">print</span> Imprimir</button>
       </div>
       <div class="table-wrap"><table>
-        <thead><tr><th>Mês</th><th style="text-align:right">Receitas</th><th style="text-align:right">Despesas</th><th style="text-align:right">Resultado</th></tr></thead>
+        <thead><tr><th>Mês</th><th style="text-align:right">Receitas</th><th style="text-align:right">Despesas</th><th style="text-align:right">Resultado</th><th style="text-align:right">Saldo Final — Banco</th></tr></thead>
         <tbody>${months.map((mo,i)=>`
           <tr>
             <td style="font-weight:600;padding:9px 14px;border-bottom:1px solid var(--border)">${MESES[i]}</td>
             <td style="text-align:right;color:var(--success);padding:9px 14px;border-bottom:1px solid var(--border)">${U.fmt(data[i].totalReceita)}</td>
             <td style="text-align:right;color:var(--danger);padding:9px 14px;border-bottom:1px solid var(--border)">${U.fmt(data[i].totalDespesa)}</td>
             <td style="text-align:right;font-weight:700;color:${data[i].resultado>=0?'var(--success)':'var(--danger)'};padding:9px 14px;border-bottom:1px solid var(--border)">${U.fmt(data[i].resultado)}</td>
+            <td style="text-align:right;color:var(--text-muted);padding:9px 14px;border-bottom:1px solid var(--border)">${U.fmt(data[i].saldoBancoFinal)}</td>
           </tr>`).join('')}
           <tr style="background:var(--surface-2)">
             <td style="font-weight:800;padding:10px 14px">TOTAL ANUAL</td>
             <td style="text-align:right;font-weight:800;color:var(--success);padding:10px 14px">${U.fmt(data.reduce((s,d)=>s+d.totalReceita,0))}</td>
             <td style="text-align:right;font-weight:800;color:var(--danger);padding:10px 14px">${U.fmt(data.reduce((s,d)=>s+d.totalDespesa,0))}</td>
             <td style="text-align:right;font-weight:800;padding:10px 14px;color:${data.reduce((s,d)=>s+d.resultado,0)>=0?'var(--success)':'var(--danger)'}">${U.fmt(data.reduce((s,d)=>s+d.resultado,0))}</td>
+            <td style="text-align:right;font-weight:800;padding:10px 14px" title="Saldo no fim de dezembro — não é soma, é a posição final do ano">${U.fmt(data[11].saldoBancoFinal)}</td>
           </tr>
         </tbody>
       </table></div>`;
