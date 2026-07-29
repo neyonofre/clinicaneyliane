@@ -33,6 +33,10 @@ export const DB = {
   },
 
   async remove(t, id) {
+    // Sem id não dá pra montar a referência: o deleteDoc estouraria com um
+    // erro obscuro e, como quem chama não esperava a promise, a tela ainda
+    // dizia "excluído". Falha explícita pra quem chama poder avisar.
+    if (!id) throw new Error(`remove(${t}): registro sem id`);
     await deleteDoc(doc(db, t, id));
     this._cache[t] = (this._cache[t] || []).filter(x => x.id !== id);
   },
@@ -44,7 +48,12 @@ export const DB = {
     // Escuta todas as coleções em tempo real
     for (const t of DB_TABLES) {
       const unsub = onSnapshot(collection(db, t), (snap) => {
-        this._cache[t] = snap.docs.map(d => d.data());
+        // O id do DOCUMENTO tem que entrar no objeto, e por último pra vencer
+        // um eventual campo "id" gravado dentro dele. Registros criados aqui
+        // no Gestão guardam "id" no próprio documento, mas os criados pelo
+        // Prontuário (addDoc) não guardam — sem isso eles chegavam com
+        // id undefined e não dava pra excluir nem editar pelo Gestão.
+        this._cache[t] = snap.docs.map(d => ({ ...d.data(), id: d.id }));
         if (renderCallback) renderCallback();
       }, (e) => {
         console.warn(`Listener [${t}]:`, e);

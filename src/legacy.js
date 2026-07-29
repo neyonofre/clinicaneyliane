@@ -1149,9 +1149,16 @@ window.savePac = (id) => {
 
 window.delPac = (id) => {
   const p = DB.getOne('pacientes', id);
-  Modal.confirm(`Excluir paciente <strong>${U.escHtml(p?.nome)}</strong>?`, () => {
-    DB.remove('pacientes', id);
-    toast('Paciente excluído','warning');
+  Modal.confirm(`Excluir paciente <strong>${U.escHtml(p?.nome)}</strong>?`, async () => {
+    // Só avisa "excluído" depois que o Firestore confirmar — antes o toast
+    // aparecia mesmo quando a exclusão falhava, e o paciente continuava lá.
+    try {
+      await DB.remove('pacientes', id);
+      toast('Paciente excluído','warning');
+    } catch (e) {
+      console.error('[delPac]', e);
+      toast('Não foi possível excluir o paciente. Recarregue a página e tente de novo.','error');
+    }
     renderPacientes();
   });
 };
@@ -1304,7 +1311,18 @@ window.saveAtend = (id) => {
   renderAtendimentos();
 };
 
-window.delAtend = (id) => Modal.confirm('Excluir este atendimento?', () => { DB.remove('atendimentos',id); toast('Atendimento excluído','warning'); renderAtendimentos(); });
+// Atendimentos também podem vir do Prontuário (sessão finalizada / pagamento
+// confirmado na agenda), então caem no mesmo caso do paciente acima.
+window.delAtend = (id) => Modal.confirm('Excluir este atendimento?', async () => {
+  try {
+    await DB.remove('atendimentos', id);
+    toast('Atendimento excluído','warning');
+  } catch (e) {
+    console.error('[delAtend]', e);
+    toast('Não foi possível excluir o atendimento. Recarregue a página e tente de novo.','error');
+  }
+  renderAtendimentos();
+});
 
 /* ===== COBRANÇA ===== */
 function renderCobranca() {
