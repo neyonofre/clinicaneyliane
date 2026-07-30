@@ -19,9 +19,14 @@ export const DB = {
     if (!item.id) {
       item.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     }
-    
-    // Save to Firestore Collection (1 document per record)
-    await setDoc(doc(db, t, item.id), item);
+
+    // merge:true — sem isso, salvar um registro (ex: editar paciente) apaga
+    // qualquer campo que a tela do Gestão não conhece. "pacientes" é
+    // compartilhado com o Prontuário, que guarda usuarioUid (o vínculo da
+    // conta do paciente com o próprio cadastro) — um set() completo, sem
+    // merge, apagava esse campo silenciosamente a cada edição pelo Gestão,
+    // derrubando o acesso do paciente ao próprio app sem erro nenhum.
+    await setDoc(doc(db, t, item.id), item, { merge: true });
 
     // Optimistic update
     const list = [...(this._cache[t] || [])];
