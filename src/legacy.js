@@ -583,38 +583,123 @@ function renderDashboard() {
   /* ── Mini Auditório: reserva avulsa por dia e hora ─────────────────────────
      Diferente dos consultórios (grade semanal por turno), o auditório é
      reservado para um DIA e HORA específicos, sem repetição. Funcionamento da
-     clínica: seg–sex 8h–21h, sáb 8h–12h, domingo fechado. */
+     clínica: seg–sex 8h–21h, sáb 8h–12h, domingo fechado.
+     Três visões: Dia (slots clicáveis), Semana (tabela hora × dia) e Mês
+     (calendário com carga de horas por dia; clique leva à visão do dia). */
   const isoLocal = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-  if (!state.audDia) state.audDia = isoLocal(new Date());
-  const audDia = state.audDia;
-  const audDiaDate = U.parseISODate(audDia);
-  const audDow = audDiaDate ? audDiaDate.getDay() : 0;
-  const audHoras = audDow === 0 ? [] : audDow === 6 ? [8,9,10,11] : [8,9,10,11,12,13,14,15,16,17,18,19,20];
+  if (!state.audDia)  state.audDia  = isoLocal(new Date());
+  if (!state.audView) state.audView = 'dia';
+  const audDia  = state.audDia;
+  const audView = state.audView;
+  const hojeISO = isoLocal(new Date());
+
   const audReservas = DB.get('reservas_auditorio');
-  const audDoDia = audReservas.filter(r => r.data === audDia);
-  const audReservaNa = (h) => audDoDia.find(r => h >= r.horaInicio && h < r.horaFim) || null;
-  const audDiaLabel = audDiaDate
-    ? audDiaDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })
-    : audDia;
+  const audHorasDe = (dow) => dow === 0 ? [] : dow === 6 ? [8,9,10,11] : [8,9,10,11,12,13,14,15,16,17,18,19,20];
+  const audReservaEm = (dataISO, h) =>
+    audReservas.find(r => r.data === dataISO && h >= r.horaInicio && h < r.horaFim) || null;
   const hh = (h) => String(h).padStart(2,'0') + 'h';
 
-  const audSlotsHtml = audHoras.length === 0
-    ? `<div class="empty-state" style="padding:18px 0"><p>Domingo — clínica fechada.</p></div>`
-    : `<div style="display:flex;flex-wrap:wrap;gap:8px">${audHoras.map(h => {
-        const r = audReservaNa(h);
-        if (r) {
-          return `<div onclick='showReservaAud("${r.id}")' title="${U.escHtml(r.titulo || 'Reservado')}" style="flex:1;min-width:96px;max-width:140px;padding:8px 6px;border-radius:8px;background:var(--danger);color:#fff;border:1px solid var(--danger);cursor:pointer;text-align:center">
-            <div style="font-size:11px;font-weight:700">${hh(h)}–${hh(h+1)}</div>
-            <div style="font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${U.escHtml(r.titulo || 'Reservado')}</div>
-          </div>`;
-        }
-        return `<div onclick='openReservaAud(${h})' title="Reservar ${hh(h)}–${hh(h+1)}" style="flex:1;min-width:96px;max-width:140px;padding:8px 6px;border-radius:8px;background:rgba(111,143,91,0.15);color:var(--text-muted);border:1px solid rgba(111,143,91,0.4);cursor:pointer;text-align:center">
-          <div style="font-size:11px;font-weight:700">${hh(h)}–${hh(h+1)}</div>
-          <div style="font-size:10.5px">Livre</div>
-        </div>`;
-      }).join('')}</div>`;
+  const audBase = U.parseISODate(audDia) || new Date();
+  const audDow  = audBase.getDay();
 
-  const hojeISO = isoLocal(new Date());
+  // Cores compartilhadas entre as visões
+  const CEL_LIVRE = 'background:rgba(111,143,91,0.15);border:1px solid rgba(111,143,91,0.4);color:var(--text-muted)';
+  const CEL_OCUP  = 'background:var(--danger);border:1px solid var(--danger);color:#fff';
+
+  let audCorpoHtml = '';
+  let audPeriodoLabel = '';
+
+  if (audView === 'dia') {
+    audPeriodoLabel = audBase.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' });
+    const horas = audHorasDe(audDow);
+    audCorpoHtml = horas.length === 0
+      ? `<div class="empty-state" style="padding:18px 0"><p>Domingo — clínica fechada.</p></div>`
+      : `<div style="display:flex;flex-wrap:wrap;gap:8px">${horas.map(h => {
+          const r = audReservaEm(audDia, h);
+          if (r) {
+            return `<div onclick='showReservaAud("${r.id}")' title="${U.escHtml(r.titulo || 'Reservado')}" style="flex:1;min-width:96px;max-width:140px;padding:8px 6px;border-radius:8px;${CEL_OCUP};cursor:pointer;text-align:center">
+              <div style="font-size:11px;font-weight:700">${hh(h)}–${hh(h+1)}</div>
+              <div style="font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${U.escHtml(r.titulo || 'Reservado')}</div>
+            </div>`;
+          }
+          return `<div onclick='openReservaAud("${audDia}", ${h})' title="Reservar ${hh(h)}–${hh(h+1)}" style="flex:1;min-width:96px;max-width:140px;padding:8px 6px;border-radius:8px;${CEL_LIVRE};cursor:pointer;text-align:center">
+            <div style="font-size:11px;font-weight:700">${hh(h)}–${hh(h+1)}</div>
+            <div style="font-size:10.5px">Livre</div>
+          </div>`;
+        }).join('')}</div>`;
+
+  } else if (audView === 'semana') {
+    // Segunda a sábado da semana do dia selecionado
+    const seg = new Date(audBase);
+    seg.setDate(audBase.getDate() - ((audBase.getDay() + 6) % 7));
+    const diasDaSemana = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(seg); d.setDate(seg.getDate() + i); return d;
+    });
+    const fimSemana = diasDaSemana[5];
+    audPeriodoLabel = `${seg.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} a ${fimSemana.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}`;
+
+    audCorpoHtml = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;text-align:center;font-size:11px;min-width:560px">
+      <thead><tr>
+        <th style="padding:6px;background:var(--surface-2);border:1px solid var(--border);width:52px"></th>
+        ${diasDaSemana.map(d => {
+          const iso = isoLocal(d);
+          const ehHoje = iso === hojeISO;
+          return `<th style="padding:6px;background:var(--surface-2);border:1px solid var(--border);font-weight:700;${ehHoje?'color:var(--primary)':''}">${d.toLocaleDateString('pt-BR',{weekday:'short'}).replace('.','')}<br><span style="font-weight:400">${d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</span></th>`;
+        }).join('')}
+      </tr></thead>
+      <tbody>${[8,9,10,11,12,13,14,15,16,17,18,19,20].map(h => `<tr>
+        <td style="padding:4px 6px;border:1px solid var(--border);background:var(--surface-2);font-weight:600;white-space:nowrap">${hh(h)}</td>
+        ${diasDaSemana.map(d => {
+          const iso = isoLocal(d);
+          if (!audHorasDe(d.getDay()).includes(h))
+            return `<td style="padding:4px;border:1px solid var(--border);background:var(--surface-2);opacity:.45">—</td>`;
+          const r = audReservaEm(iso, h);
+          if (r)
+            return `<td onclick='showReservaAud("${r.id}")' title="${U.escHtml(r.titulo || 'Reservado')}" style="padding:4px;border:1px solid var(--border);${CEL_OCUP};cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">${U.escHtml(r.titulo || 'Reservado')}</td>`;
+          return `<td onclick='openReservaAud("${iso}", ${h})' title="Reservar ${hh(h)}–${hh(h+1)}" style="padding:4px;border:1px solid var(--border);${CEL_LIVRE};cursor:pointer"> </td>`;
+        }).join('')}
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+
+  } else {
+    // Mês: calendário com a carga de horas reservadas por dia
+    const y0 = audBase.getFullYear(), m0 = audBase.getMonth();
+    audPeriodoLabel = audBase.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    const diasNoMes = new Date(y0, m0 + 1, 0).getDate();
+    const offset = new Date(y0, m0, 1).getDay(); // domingo-primeiro
+    const horasDoDiaISO = (iso) => audReservas.filter(r => r.data === iso)
+      .reduce((soma, r) => soma + (r.horaFim - r.horaInicio), 0);
+
+    const celulas = [];
+    for (let i = 0; i < offset; i++) celulas.push('<td style="border:1px solid var(--border)"></td>');
+    for (let dia = 1; dia <= diasNoMes; dia++) {
+      const d = new Date(y0, m0, dia);
+      const iso = isoLocal(d);
+      const dow = d.getDay();
+      const fechado = dow === 0;
+      const horas = horasDoDiaISO(iso);
+      const capacidade = audHorasDe(dow).length;
+      const ehHoje = iso === hojeISO;
+      const badge = horas > 0
+        ? `<div style="margin-top:3px"><span style="display:inline-block;padding:1px 7px;border-radius:10px;background:${horas >= capacidade ? 'var(--danger)' : 'rgba(177,84,63,0.25)'};color:${horas >= capacidade ? '#fff' : 'var(--danger)'};font-size:10px;font-weight:700">${horas}h</span></div>`
+        : (fechado ? '' : `<div style="margin-top:3px;font-size:10px;color:var(--text-muted)">livre</div>`);
+      celulas.push(`<td onclick='audAbrirDia("${iso}")' style="padding:6px 4px;border:1px solid var(--border);vertical-align:top;cursor:${fechado?'default':'pointer'};${fechado?'background:var(--surface-2);opacity:.55':''};${ehHoje?'box-shadow:inset 0 0 0 2px var(--primary)':''}">
+        <div style="font-size:11.5px;font-weight:${ehHoje?'800':'600'}">${dia}</div>${badge}
+      </td>`);
+    }
+    while (celulas.length % 7 !== 0) celulas.push('<td style="border:1px solid var(--border)"></td>');
+    const linhas = [];
+    for (let i = 0; i < celulas.length; i += 7) linhas.push(`<tr>${celulas.slice(i, i+7).join('')}</tr>`);
+
+    audCorpoHtml = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;text-align:center;font-size:12px;min-width:560px;table-layout:fixed">
+      <thead><tr>${['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(d =>
+        `<th style="padding:6px;background:var(--surface-2);border:1px solid var(--border);font-weight:700">${d}</th>`).join('')}
+      </tr></thead>
+      <tbody>${linhas.join('')}</tbody>
+    </table></div>
+    <div style="margin-top:8px;font-size:11px;color:var(--text-muted);text-align:center">O badge mostra as horas reservadas no dia — clique num dia para ver e reservar os horários.</div>`;
+  }
+
   const audProximas = audReservas
     .filter(r => r.data >= hojeISO)
     .sort((a,b) => a.data === b.data ? a.horaInicio - b.horaInicio : a.data.localeCompare(b.data))
@@ -631,19 +716,23 @@ function renderDashboard() {
         </div>`).join('')}
     </div>`;
 
+  const audBotaoVista = (v, label) =>
+    `<button class="btn ${audView === v ? 'btn-primary' : 'btn-secondary'}" style="padding:6px 12px;font-size:12px" onclick="audSetView('${v}')">${label}</button>`;
+
   const audHtml = `
     <div class="card" style="margin-bottom:20px">
       <div class="card-title">Mini Auditório <span>Reserva por dia e hora — não se repete toda semana</span></div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-        <button class="btn btn-secondary" style="padding:6px 10px" onclick="audMudaDia(-1)"><span class="msi">chevron_left</span></button>
+        <div style="display:flex;gap:4px">${audBotaoVista('dia','Dia')}${audBotaoVista('semana','Semana')}${audBotaoVista('mes','Mês')}</div>
+        <button class="btn btn-secondary" style="padding:6px 10px" onclick="audMudaPeriodo(-1)"><span class="msi">chevron_left</span></button>
         <input type="date" value="${audDia}" onchange="audSetDia(this.value)"
           style="padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-size:13px">
-        <button class="btn btn-secondary" style="padding:6px 10px" onclick="audMudaDia(1)"><span class="msi">chevron_right</span></button>
+        <button class="btn btn-secondary" style="padding:6px 10px" onclick="audMudaPeriodo(1)"><span class="msi">chevron_right</span></button>
         <button class="btn btn-secondary" style="padding:6px 12px;font-size:12px" onclick="audSetDia('${hojeISO}')">Hoje</button>
-        <span style="font-size:13px;color:var(--text-muted);text-transform:capitalize">${audDiaLabel}</span>
+        <span style="font-size:13px;color:var(--text-muted);text-transform:capitalize">${audPeriodoLabel}</span>
         <span style="margin-left:auto;font-size:11.5px;color:var(--text-muted)">Seg–sex 8h–21h • Sáb 8h–12h</span>
       </div>
-      ${audSlotsHtml}
+      ${audCorpoHtml}
       ${audProximasHtml}
     </div>`;
 
@@ -742,23 +831,29 @@ function renderDashboard() {
       </div>
     </div>`;
 
-  window.audSetDia = (v) => { if (!v) return; state.audDia = v; renderDashboard(); };
-  window.audMudaDia = (delta) => {
+  window.audSetDia  = (v) => { if (!v) return; state.audDia = v; renderDashboard(); };
+  window.audSetView = (v) => { state.audView = v; renderDashboard(); };
+  window.audAbrirDia = (iso) => { state.audDia = iso; state.audView = 'dia'; renderDashboard(); };
+  window.audMudaPeriodo = (delta) => {
     const d = U.parseISODate(state.audDia) || new Date();
-    d.setDate(d.getDate() + delta);
+    if (state.audView === 'mes') d.setMonth(d.getMonth() + delta);
+    else d.setDate(d.getDate() + delta * (state.audView === 'semana' ? 7 : 1));
     state.audDia = isoLocal(d);
     renderDashboard();
   };
 
-  window.openReservaAud = (hora) => {
+  window.openReservaAud = (dataISO, hora) => {
+    const dBase = U.parseISODate(dataISO);
+    const dow = dBase ? dBase.getDay() : 0;
+    const rotulo = dBase ? dBase.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' }) : dataISO;
     // Hora fim: só até onde estiver livre em sequência (e dentro do expediente).
-    const fimMax = audDow === 6 ? 12 : 21;
+    const fimMax = dow === 6 ? 12 : 21;
     const opcoesFim = [];
     for (let f = hora + 1; f <= fimMax; f++) {
       opcoesFim.push(f);
-      if (audReservaNa(f)) break; // f está ocupada — dá pra terminar nela, não atravessá-la
+      if (audReservaEm(dataISO, f)) break; // f está ocupada — dá pra terminar nela, não atravessá-la
     }
-    Modal.open(`Reservar Mini Auditório — ${audDiaLabel}`, `
+    Modal.open(`Reservar Mini Auditório — ${rotulo}`, `
       <div style="display:grid;gap:12px">
         <div>
           <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Evento / finalidade *</label>
@@ -782,11 +877,11 @@ function renderDashboard() {
         </div>
       </div>`,
       `<button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button>
-       <button class="btn btn-primary" onclick="saveReservaAud(${hora})">Reservar</button>`, 'sm');
+       <button class="btn btn-primary" onclick='saveReservaAud("${dataISO}", ${hora})'>Reservar</button>`, 'sm');
     document.getElementById('aud-titulo').focus();
   };
 
-  window.saveReservaAud = async (hora) => {
+  window.saveReservaAud = async (dataISO, hora) => {
     const titulo = document.getElementById('aud-titulo').value.trim();
     const responsavel = document.getElementById('aud-resp').value.trim();
     const horaFim = parseInt(document.getElementById('aud-fim').value, 10);
@@ -795,11 +890,11 @@ function renderDashboard() {
     // Revalida contra o cache ATUAL: outra pessoa pode ter reservado enquanto
     // o modal estava aberto — o listener em tempo real já teria atualizado.
     const conflito = DB.get('reservas_auditorio').some(r =>
-      r.data === audDia && !(horaFim <= r.horaInicio || hora >= r.horaFim));
+      r.data === dataISO && !(horaFim <= r.horaInicio || hora >= r.horaFim));
     if (conflito) { toast('Esse horário acabou de ser reservado por outra pessoa.', 'error'); renderDashboard(); Modal.close(); return; }
 
     await DB.save('reservas_auditorio', {
-      data: audDia, horaInicio: hora, horaFim,
+      data: dataISO, horaInicio: hora, horaFim,
       titulo, responsavel,
       criadoPor: (window.Session && Session.email) || '',
       criadoEm: Date.now(),
