@@ -34,7 +34,8 @@ export const SUBCATS = [
   { k:'4.7',l:'Descartáveis',g:'4' }, { k:'4.8',l:'Reformas',g:'4' }, { k:'4.9',l:'Propaganda e Marketing',g:'4' }, { k:'4.10',l:'Outros (Variáveis)',g:'4' }
 ];
 
-export const SALAS = ['Sala 1','Sala 2','Sala 3 (Infantil)','Sala 4','Sala 5','Mini Auditório'];
+// Sem o Mini Auditório: reserva avulsa por dia/hora, seção própria do Dashboard.
+export const SALAS = ['Sala 1','Sala 2','Sala 3 (Infantil)','Sala 4','Sala 5'];
 export const DIAS_SEMANA_WORK = ['Seg','Ter','Qua','Qui','Sex','Sáb'];
 export const TURNOS_NAMES = ['Manhã','Tarde','Noite'];
 export const CATS_RECEITA = [

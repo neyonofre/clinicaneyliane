@@ -33,7 +33,9 @@ window.SUBCATS = [
   { k:'4.7',l:'Descartáveis',g:'4' }, { k:'4.8',l:'Reformas',g:'4' }, { k:'4.9',l:'Propaganda e Marketing',g:'4' }, { k:'4.10',l:'Outros (Variáveis)',g:'4' }
 ];
 
-window.SALAS = ['Sala 1','Sala 2','Sala 3 (Infantil)','Sala 4','Sala 5','Mini Auditório'];
+// Mini Auditório saiu daqui: ele não é consultório com grade semanal fixa —
+// tem reserva avulsa por dia e hora, na seção própria do Dashboard.
+window.SALAS = ['Sala 1','Sala 2','Sala 3 (Infantil)','Sala 4','Sala 5'];
 window.DIAS_SEMANA_WORK = ['Seg','Ter','Qua','Qui','Sex','Sáb'];
 window.TURNOS_NAMES = ['Manhã','Tarde','Noite'];
 window.CATS_RECEITA = [
@@ -284,7 +286,7 @@ window.Modal = window.Modal || {
 /* ===== PAGE STATE (persists currently-viewed month/filters across re-renders) ===== */
 const _now0 = new Date();
 const PageState = {
-  dashboard: { y: _now0.getFullYear(), m: _now0.getMonth()+1 },
+  dashboard: { y: _now0.getFullYear(), m: _now0.getMonth()+1, audDia: null },
   atendimentos: { y: _now0.getFullYear(), m: _now0.getMonth()+1, filterProf: '' },
   despesas: { y: _now0.getFullYear(), m: _now0.getMonth()+1, filterCat: '' },
   receitas: { y: _now0.getFullYear(), m: _now0.getMonth()+1 },
@@ -577,6 +579,74 @@ function renderDashboard() {
       <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:2px;background:#8a5a7a"></span> Conflito (+1 prof.)</span>
     </div>`;
 
+
+  /* ── Mini Auditório: reserva avulsa por dia e hora ─────────────────────────
+     Diferente dos consultórios (grade semanal por turno), o auditório é
+     reservado para um DIA e HORA específicos, sem repetição. Funcionamento da
+     clínica: seg–sex 8h–21h, sáb 8h–12h, domingo fechado. */
+  const isoLocal = (dt) => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  if (!state.audDia) state.audDia = isoLocal(new Date());
+  const audDia = state.audDia;
+  const audDiaDate = U.parseISODate(audDia);
+  const audDow = audDiaDate ? audDiaDate.getDay() : 0;
+  const audHoras = audDow === 0 ? [] : audDow === 6 ? [8,9,10,11] : [8,9,10,11,12,13,14,15,16,17,18,19,20];
+  const audReservas = DB.get('reservas_auditorio');
+  const audDoDia = audReservas.filter(r => r.data === audDia);
+  const audReservaNa = (h) => audDoDia.find(r => h >= r.horaInicio && h < r.horaFim) || null;
+  const audDiaLabel = audDiaDate
+    ? audDiaDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })
+    : audDia;
+  const hh = (h) => String(h).padStart(2,'0') + 'h';
+
+  const audSlotsHtml = audHoras.length === 0
+    ? `<div class="empty-state" style="padding:18px 0"><p>Domingo — clínica fechada.</p></div>`
+    : `<div style="display:flex;flex-wrap:wrap;gap:8px">${audHoras.map(h => {
+        const r = audReservaNa(h);
+        if (r) {
+          return `<div onclick='showReservaAud("${r.id}")' title="${U.escHtml(r.titulo || 'Reservado')}" style="flex:1;min-width:96px;max-width:140px;padding:8px 6px;border-radius:8px;background:var(--danger);color:#fff;border:1px solid var(--danger);cursor:pointer;text-align:center">
+            <div style="font-size:11px;font-weight:700">${hh(h)}–${hh(h+1)}</div>
+            <div style="font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${U.escHtml(r.titulo || 'Reservado')}</div>
+          </div>`;
+        }
+        return `<div onclick='openReservaAud(${h})' title="Reservar ${hh(h)}–${hh(h+1)}" style="flex:1;min-width:96px;max-width:140px;padding:8px 6px;border-radius:8px;background:rgba(111,143,91,0.15);color:var(--text-muted);border:1px solid rgba(111,143,91,0.4);cursor:pointer;text-align:center">
+          <div style="font-size:11px;font-weight:700">${hh(h)}–${hh(h+1)}</div>
+          <div style="font-size:10.5px">Livre</div>
+        </div>`;
+      }).join('')}</div>`;
+
+  const hojeISO = isoLocal(new Date());
+  const audProximas = audReservas
+    .filter(r => r.data >= hojeISO)
+    .sort((a,b) => a.data === b.data ? a.horaInicio - b.horaInicio : a.data.localeCompare(b.data))
+    .slice(0, 6);
+  const audProximasHtml = audProximas.length === 0 ? '' : `
+    <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px">
+      <div style="font-size:11.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Próximas reservas</div>
+      ${audProximas.map(r => `
+        <div class="list-item" style="cursor:pointer" onclick='showReservaAud("${r.id}")'>
+          <div class="list-item-info">
+            <div class="list-item-name">${U.escHtml(r.titulo || 'Reservado')}</div>
+            <div class="list-item-sub">${U.parseISODate(r.data)?.toLocaleDateString('pt-BR', { weekday:'short', day:'2-digit', month:'2-digit' }) ?? r.data} • ${hh(r.horaInicio)}–${hh(r.horaFim)}${r.responsavel ? ' • ' + U.escHtml(r.responsavel) : ''}</div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+
+  const audHtml = `
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-title">Mini Auditório <span>Reserva por dia e hora — não se repete toda semana</span></div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn btn-secondary" style="padding:6px 10px" onclick="audMudaDia(-1)"><span class="msi">chevron_left</span></button>
+        <input type="date" value="${audDia}" onchange="audSetDia(this.value)"
+          style="padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-size:13px">
+        <button class="btn btn-secondary" style="padding:6px 10px" onclick="audMudaDia(1)"><span class="msi">chevron_right</span></button>
+        <button class="btn btn-secondary" style="padding:6px 12px;font-size:12px" onclick="audSetDia('${hojeISO}')">Hoje</button>
+        <span style="font-size:13px;color:var(--text-muted);text-transform:capitalize">${audDiaLabel}</span>
+        <span style="margin-left:auto;font-size:11.5px;color:var(--text-muted)">Seg–sex 8h–21h • Sáb 8h–12h</span>
+      </div>
+      ${audSlotsHtml}
+      ${audProximasHtml}
+    </div>`;
+
   content.innerHTML = `
     <div class="kpi-grid">
       <div class="kpi-card">
@@ -643,6 +713,8 @@ function renderDashboard() {
       </div>
     </div>
 
+    ${audHtml}
+
     <div class="dash-grid">
       <div class="card">
         <div class="card-title">Últimos Atendimentos</div>
@@ -669,6 +741,96 @@ function renderDashboard() {
           </div>`).join('')}
       </div>
     </div>`;
+
+  window.audSetDia = (v) => { if (!v) return; state.audDia = v; renderDashboard(); };
+  window.audMudaDia = (delta) => {
+    const d = U.parseISODate(state.audDia) || new Date();
+    d.setDate(d.getDate() + delta);
+    state.audDia = isoLocal(d);
+    renderDashboard();
+  };
+
+  window.openReservaAud = (hora) => {
+    // Hora fim: só até onde estiver livre em sequência (e dentro do expediente).
+    const fimMax = audDow === 6 ? 12 : 21;
+    const opcoesFim = [];
+    for (let f = hora + 1; f <= fimMax; f++) {
+      opcoesFim.push(f);
+      if (audReservaNa(f)) break; // f está ocupada — dá pra terminar nela, não atravessá-la
+    }
+    Modal.open(`Reservar Mini Auditório — ${audDiaLabel}`, `
+      <div style="display:grid;gap:12px">
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Evento / finalidade *</label>
+          <input id="aud-titulo" type="text" placeholder="Ex.: Grupo de pais, palestra, supervisão…" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-size:13px">
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Responsável</label>
+          <input id="aud-resp" type="text" placeholder="Quem reservou" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-size:13px">
+        </div>
+        <div style="display:flex;gap:10px;align-items:end">
+          <div>
+            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Início</label>
+            <input value="${hh(hora)}" disabled style="width:80px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-muted);font-size:13px">
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Fim</label>
+            <select id="aud-fim" style="padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-size:13px">
+              ${opcoesFim.map(f => `<option value="${f}">${hh(f)}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+      </div>`,
+      `<button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button>
+       <button class="btn btn-primary" onclick="saveReservaAud(${hora})">Reservar</button>`, 'sm');
+    document.getElementById('aud-titulo').focus();
+  };
+
+  window.saveReservaAud = async (hora) => {
+    const titulo = document.getElementById('aud-titulo').value.trim();
+    const responsavel = document.getElementById('aud-resp').value.trim();
+    const horaFim = parseInt(document.getElementById('aud-fim').value, 10);
+    if (!titulo) { toast('Informe o evento/finalidade da reserva.', 'error'); return; }
+
+    // Revalida contra o cache ATUAL: outra pessoa pode ter reservado enquanto
+    // o modal estava aberto — o listener em tempo real já teria atualizado.
+    const conflito = DB.get('reservas_auditorio').some(r =>
+      r.data === audDia && !(horaFim <= r.horaInicio || hora >= r.horaFim));
+    if (conflito) { toast('Esse horário acabou de ser reservado por outra pessoa.', 'error'); renderDashboard(); Modal.close(); return; }
+
+    await DB.save('reservas_auditorio', {
+      data: audDia, horaInicio: hora, horaFim,
+      titulo, responsavel,
+      criadoPor: (window.Session && Session.email) || '',
+      criadoEm: Date.now(),
+    });
+    Modal.close();
+    toast('Mini Auditório reservado.', 'success');
+    renderDashboard();
+  };
+
+  window.showReservaAud = (id) => {
+    const r = DB.getOne('reservas_auditorio', id);
+    if (!r) return;
+    const dataLabel = U.parseISODate(r.data)?.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' }) ?? r.data;
+    Modal.open('Reserva — Mini Auditório', `
+      <div style="display:grid;gap:8px;font-size:13.5px">
+        <div><strong>${U.escHtml(r.titulo || 'Reservado')}</strong></div>
+        <div style="color:var(--text-muted);text-transform:capitalize">${dataLabel}</div>
+        <div style="color:var(--text-muted)">${hh(r.horaInicio)} às ${hh(r.horaFim)}</div>
+        ${r.responsavel ? `<div style="color:var(--text-muted)">Responsável: ${U.escHtml(r.responsavel)}</div>` : ''}
+      </div>`,
+      `<button class="btn btn-secondary" onclick="Modal.close()">Fechar</button>
+       <button class="btn btn-danger" onclick='cancelarReservaAud("${r.id}")'>Cancelar reserva</button>`, 'sm');
+  };
+
+  window.cancelarReservaAud = (id) => {
+    Modal.confirm('Cancelar esta reserva do Mini Auditório?', async () => {
+      await DB.remove('reservas_auditorio', id);
+      toast('Reserva cancelada.', 'success');
+      renderDashboard();
+    });
+  };
 
   window.showOccCell = (sala, dia, turno) => {
     const ps = occGrid[sala]?.[dia]?.[turno] || [];

@@ -20,7 +20,8 @@ service cloud.firestore {
         collection == 'cobrancas_excluidas' ||
         collection == 'receitas' ||
         collection == 'custom_subcats' ||
-        collection == 'custom_rec_cats'
+        collection == 'custom_rec_cats' ||
+        collection == 'reservas_auditorio'
       );
     }
   }
