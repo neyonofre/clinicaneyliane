@@ -4,7 +4,7 @@ import { collection, doc, getDocs, getDoc, setDoc, deleteDoc, onSnapshot } from 
 const DB_TABLES = [
   'profissionais', 'pacientes', 'atendimentos', 'despesas', 
   'cobrancas', 'cobrancas_excluidas', 'receitas', 
-  'custom_subcats', 'custom_rec_cats', 'reservas_auditorio'
+  'custom_subcats', 'custom_rec_cats', 'reservas_auditorio', 'despesas_profissional'
 ];
 
 export const DB = {

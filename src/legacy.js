@@ -33,6 +33,75 @@ window.SUBCATS = [
   { k:'4.7',l:'Descartáveis',g:'4' }, { k:'4.8',l:'Reformas',g:'4' }, { k:'4.9',l:'Propaganda e Marketing',g:'4' }, { k:'4.10',l:'Outros (Variáveis)',g:'4' }
 ];
 
+// ── Despesas PESSOAIS do profissional (livro caixa individual) ───────────────
+// Nada a ver com CATS_DESPESA/SUBCATS, que são as despesas DA CLÍNICA e entram
+// no balancete. Estas são do bolso de cada profissional: ficam na coleção
+// despesas_profissional, aparecem só na aba Financeiro dele e nunca no
+// resultado da clínica.
+//
+// "livroCaixa" marca a despesa dedutível — a que o profissional quer ver no
+// próprio livro caixa (Carnê-Leão). Cada tipo traz um padrão, mas o campo é
+// editável no lançamento: o mesmo gasto pode ou não ser dedutível dependendo
+// do caso, e quem decide é o contador, não o app.
+window.GRUPOS_DESPESA_PROF = {
+  prof:      'Profissionais e Carreira',
+  consult:   'Consultório e Trabalho',
+  impostos:  'Impostos e Contribuições',
+  pessoal:   'Pessoais',
+  saude:     'Saúde e Educação',
+  transporte:'Transporte',
+  outros:    'Outros',
+};
+
+window.TIPOS_DESPESA_PROF = [
+  // Profissionais e Carreira — dedutíveis no livro caixa
+  { k:'anuidade_conselho', l:'Anuidade do conselho (CRP/CRM/CRFa…)', g:'prof',      livroCaixa:true },
+  { k:'cursos',            l:'Cursos, congressos e capacitação',     g:'prof',      livroCaixa:true },
+  { k:'supervisao',        l:'Supervisão clínica',                   g:'prof',      livroCaixa:true },
+  { k:'terapia_pessoal',   l:'Terapia/análise pessoal',              g:'prof',      livroCaixa:true },
+  { k:'livros_material',   l:'Livros e material técnico',            g:'prof',      livroCaixa:true },
+  { k:'seguro_prof',       l:'Seguro de responsabilidade civil',     g:'prof',      livroCaixa:true },
+  { k:'assoc_sindicato',   l:'Associação de classe / sindicato',     g:'prof',      livroCaixa:true },
+
+  // Consultório e Trabalho — dedutíveis
+  { k:'aluguel_sala',      l:'Aluguel de sala / sublocação',         g:'consult',   livroCaixa:true },
+  { k:'testes_psico',      l:'Testes e instrumentos de avaliação',   g:'consult',   livroCaixa:true },
+  { k:'material_consult',  l:'Material de consultório',              g:'consult',   livroCaixa:true },
+  { k:'software',          l:'Software e assinaturas profissionais', g:'consult',   livroCaixa:true },
+  { k:'marketing_prof',    l:'Divulgação e marketing próprio',       g:'consult',   livroCaixa:true },
+  { k:'secretaria',        l:'Secretária / apoio administrativo',    g:'consult',   livroCaixa:true },
+  { k:'telefone_trabalho', l:'Telefone e internet do trabalho',      g:'consult',   livroCaixa:true },
+
+  // Impostos e Contribuições — dedutíveis
+  { k:'inss_autonomo',     l:'INSS autônomo (carnê)',                g:'impostos',  livroCaixa:true },
+  { k:'iss',               l:'ISS',                                  g:'impostos',  livroCaixa:true },
+  { k:'contador',          l:'Contador / contabilidade',             g:'impostos',  livroCaixa:true },
+  { k:'carne_leao',        l:'Carnê-Leão (IRPF mensal)',             g:'impostos',  livroCaixa:false },
+
+  // Saúde e Educação — NÃO entram no livro caixa (vão na declaração anual)
+  { k:'plano_saude',       l:'Plano de saúde',                       g:'saude',     livroCaixa:false },
+  { k:'consultas_exames',  l:'Consultas e exames',                   g:'saude',     livroCaixa:false },
+  { k:'educacao_filhos',   l:'Educação (própria ou dependentes)',    g:'saude',     livroCaixa:false },
+
+  // Transporte
+  { k:'combustivel',       l:'Combustível',                          g:'transporte',livroCaixa:false },
+  { k:'estacionamento',    l:'Estacionamento',                       g:'transporte',livroCaixa:false },
+  { k:'app_transporte',    l:'Táxi / aplicativo de transporte',      g:'transporte',livroCaixa:false },
+  { k:'manutencao_veic',   l:'Manutenção do veículo',                g:'transporte',livroCaixa:false },
+
+  // Pessoais
+  { k:'moradia',           l:'Moradia (aluguel, condomínio, contas)',g:'pessoal',   livroCaixa:false },
+  { k:'alimentacao',       l:'Alimentação',                          g:'pessoal',   livroCaixa:false },
+  { k:'lazer',             l:'Lazer e viagens',                      g:'pessoal',   livroCaixa:false },
+  { k:'vestuario',         l:'Vestuário',                            g:'pessoal',   livroCaixa:false },
+
+  { k:'outros_prof',       l:'Outros',                               g:'outros',    livroCaixa:false },
+];
+
+window.tipoDespesaProf = function tipoDespesaProf(k) {
+  return TIPOS_DESPESA_PROF.find(t => t.k === k) || null;
+}
+
 // Mini Auditório saiu daqui: ele não é consultório com grade semanal fixa —
 // tem reserva avulsa por dia e hora, na seção própria do Dashboard.
 window.SALAS = ['Sala 1','Sala 2','Sala 3 (Infantil)','Sala 4','Sala 5'];
@@ -290,7 +359,8 @@ const PageState = {
   atendimentos: { y: _now0.getFullYear(), m: _now0.getMonth()+1, filterProf: '' },
   despesas: { y: _now0.getFullYear(), m: _now0.getMonth()+1, filterCat: '' },
   receitas: { y: _now0.getFullYear(), m: _now0.getMonth()+1 },
-  balancete: { y: _now0.getFullYear(), m: _now0.getMonth()+1, viewType: 'mensal' }
+  balancete: { y: _now0.getFullYear(), m: _now0.getMonth()+1, viewType: 'mensal' },
+  financeiro: { y: _now0.getFullYear(), m: _now0.getMonth()+1, profId: '' }
 };
 
 /* ===== HELPERS ===== */
@@ -995,6 +1065,282 @@ window.dashSetMonth = function(val) {
   PageState.dashboard.m = parseInt(mm, 10);
   if (window.renderDashboard) window.renderDashboard();
 };
+
+
+/* ===== FINANCEIRO DO PROFISSIONAL =====
+   Visão INDIVIDUAL: produção (o que ele recebeu dos pacientes) e livro caixa
+   pessoal (despesas do bolso dele). Não se mistura com o balancete da clínica:
+   as despesas daqui moram em despesas_profissional e nunca entram no resultado
+   da clínica — são despesas PESSOAIS.
+
+   O Gestão tem login único (não há papel por profissional), então quem abre
+   escolhe de quem quer ver. Se o e-mail logado bater com o de um profissional
+   cadastrado, ele já vem selecionado. */
+function renderFinanceiroProf() {
+  const state = PageState.financeiro;
+  const profs = DB.get('profissionais').filter(p => p.ativo).sort((a,b)=>a.nome.localeCompare(b.nome));
+
+  // Pré-seleção pelo e-mail logado — quem é profissional cai direto no seu.
+  if (!state.profId) {
+    const eu = profs.find(p => (p.email||'').toLowerCase() === (Session.email||'').toLowerCase());
+    state.profId = eu ? eu.id : (profs[0]?.id || '');
+  }
+
+  function draw() {
+    const { y, m, profId } = state;
+    const prof = DB.getOne('profissionais', profId);
+    const noMes = (iso) => { const d = U.parseISODate(iso); return d && d.getFullYear()===y && d.getMonth()+1===m; };
+
+    const atends = DB.get('atendimentos')
+      .filter(a => a.profissionalId === profId && noMes(a.data))
+      .sort((a,b) => b.data.localeCompare(a.data));
+
+    // Bruto = o que o paciente pagou. Repasse = o que fica com a clínica.
+    // Líquido = o que sobra para o profissional. Em sublocação o repasse é
+    // zero por atendimento (ele paga mensalidade fixa, cobrada à parte).
+    const bruto   = atends.reduce((s,a) => s + (a.valor||0), 0);
+    const repasse = atends.reduce((s,a) => s + U.calcRepasse(a), 0);
+    const liquido = bruto - repasse;
+
+    const comNota = atends.filter(a => a.comNota === true);
+    const semNota = atends.filter(a => a.comNota === false);
+    const naoInf  = atends.filter(a => a.comNota === undefined);
+    const vlrComNota = comNota.reduce((s,a)=>s+(a.valor||0),0);
+    const vlrSemNota = semNota.reduce((s,a)=>s+(a.valor||0),0);
+    const vlrNaoInf  = naoInf.reduce((s,a)=>s+(a.valor||0),0);
+
+    const despesas = DB.get('despesas_profissional')
+      .filter(d => d.profissionalId === profId && noMes(d.data))
+      .sort((a,b) => b.data.localeCompare(a.data));
+    const totalDesp = despesas.reduce((s,d) => s + (d.valor||0), 0);
+    const totalLivro = despesas.filter(d => d.livroCaixa).reduce((s,d) => s + (d.valor||0), 0);
+    const resultado = liquido - totalDesp;
+
+    const etiquetaNota = (a) => a.comNota === undefined
+      ? '<span class="badge badge-gray" style="font-size:10.5px">não informado</span>'
+      : a.comNota
+        ? '<span class="badge badge-info" style="font-size:10.5px">com nota</span>'
+        : '<span class="badge badge-warning" style="font-size:10.5px">sem nota</span>';
+
+    // Despesas agrupadas por tipo, como a clínica pediu
+    const porGrupo = {};
+    despesas.forEach(d => {
+      const t = tipoDespesaProf(d.tipo);
+      const g = t ? t.g : 'outros';
+      (porGrupo[g] = porGrupo[g] || []).push(d);
+    });
+
+    document.getElementById('fin-body').innerHTML = `
+      <div class="kpi-grid" style="margin-bottom:18px">
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:var(--info-light);color:var(--info)"><span class="msi">receipt_long</span></div>
+          <div class="kpi-info"><div class="kpi-label">Produção bruta</div>
+            <div class="kpi-value">${U.fmtShort(bruto)}</div>
+            <div class="kpi-sub">${atends.length} atendimento${atends.length===1?'':'s'}</div></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:var(--danger-light);color:var(--danger)"><span class="msi">call_split</span></div>
+          <div class="kpi-info"><div class="kpi-label">Repasse à clínica</div>
+            <div class="kpi-value">${U.fmtShort(repasse)}</div>
+            <div class="kpi-sub">${prof ? (REGIMES[prof.regime]||prof.regime) : '—'}</div></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:var(--success-light);color:var(--success)"><span class="msi">savings</span></div>
+          <div class="kpi-info"><div class="kpi-label">Líquido do profissional</div>
+            <div class="kpi-value" style="color:var(--success)">${U.fmtShort(liquido)}</div>
+            <div class="kpi-sub">Produção − repasse</div></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:${resultado>=0?'var(--success-light)':'var(--danger-light)'};color:${resultado>=0?'var(--success)':'var(--danger)'}"><span class="msi">monitoring</span></div>
+          <div class="kpi-info"><div class="kpi-label">Resultado pessoal</div>
+            <div class="kpi-value" style="color:${resultado>=0?'var(--success)':'var(--danger)'}">${U.fmtShort(resultado)}</div>
+            <div class="kpi-sub">Líquido − despesas pessoais</div></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:18px">
+        <div class="card-title">Nota fiscal <span>Como a produção do mês se divide</span></div>
+        <div class="stat-row">
+          <div class="stat-chip">Com nota: <strong style="color:var(--info)">${U.fmt(vlrComNota)}</strong> (${comNota.length})</div>
+          <div class="stat-chip">Sem nota: <strong style="color:var(--warning,#c08a3e)">${U.fmt(vlrSemNota)}</strong> (${semNota.length})</div>
+          ${naoInf.length ? `<div class="stat-chip">Não informado: <strong>${U.fmt(vlrNaoInf)}</strong> (${naoInf.length})</div>` : ''}
+        </div>
+        ${naoInf.length ? `<p style="margin-top:8px;font-size:11.5px;color:var(--text-muted)">"Não informado" são atendimentos anteriores à distinção com/sem nota — não significa que foram sem nota.</p>` : ''}
+      </div>
+
+      <div class="card" style="margin-bottom:18px">
+        <div class="card-title">Produção do mês <span>${atends.length} atendimento${atends.length===1?'':'s'}</span></div>
+        ${atends.length ? `<div class="table-wrap"><table>
+          <thead><tr><th>Data</th><th>Paciente</th><th>Nota</th><th style="text-align:right">Valor</th><th style="text-align:right">Repasse</th><th style="text-align:right">Líquido</th></tr></thead>
+          <tbody>${atends.map(a => {
+            const rep = U.calcRepasse(a);
+            return `<tr>
+              <td>${U.date(a.data)}</td>
+              <td>${U.escHtml(a.pacienteNome || U.pacNome(a.pacienteId))}</td>
+              <td>${etiquetaNota(a)}</td>
+              <td style="text-align:right;font-weight:600">${U.fmt(a.valor)}</td>
+              <td style="text-align:right;color:var(--danger)">${U.fmt(rep)}</td>
+              <td style="text-align:right;color:var(--success);font-weight:600">${U.fmt((a.valor||0)-rep)}</td>
+            </tr>`;
+          }).join('')}
+          <tr style="background:var(--surface-2)">
+            <td colspan="3" style="font-weight:700;padding:10px 14px">TOTAL</td>
+            <td style="text-align:right;font-weight:800;padding:10px 14px">${U.fmt(bruto)}</td>
+            <td style="text-align:right;font-weight:800;color:var(--danger);padding:10px 14px">${U.fmt(repasse)}</td>
+            <td style="text-align:right;font-weight:800;color:var(--success);padding:10px 14px">${U.fmt(liquido)}</td>
+          </tr></tbody></table></div>`
+          : '<div class="empty-state"><div class="empty-icon"><span class="msi">assignment</span></div><p>Nenhum atendimento neste mês.</p></div>'}
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <span>Despesas pessoais <span>Livro caixa individual — não entra no balancete da clínica</span></span>
+          <button class="btn btn-primary" style="padding:6px 12px;font-size:12px" onclick="editDespProf()"><span class="msi">add</span> Nova despesa</button>
+        </div>
+        <div class="stat-row">
+          <div class="stat-chip">Total do mês: <strong style="color:var(--danger)">${U.fmt(totalDesp)}</strong></div>
+          <div class="stat-chip">Dedutível (livro caixa): <strong>${U.fmt(totalLivro)}</strong></div>
+          <div class="stat-chip">Lançamentos: <strong>${despesas.length}</strong></div>
+        </div>
+        ${despesas.length ? Object.entries(porGrupo).map(([g, lista]) => `
+          <div style="margin-top:14px">
+            <div style="font-size:11.5px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">
+              ${U.escHtml(GRUPOS_DESPESA_PROF[g] || 'Outros')} — ${U.fmt(lista.reduce((s,d)=>s+(d.valor||0),0))}
+            </div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Livro caixa</th><th style="text-align:right">Valor</th><th style="text-align:right">Ações</th></tr></thead>
+              <tbody>${lista.map(d => `
+                <tr>
+                  <td>${U.date(d.data)}</td>
+                  <td>${U.escHtml(tipoDespesaProf(d.tipo)?.l || d.tipo)}</td>
+                  <td>${U.escHtml(d.descricao || '—')}</td>
+                  <td>${d.livroCaixa ? '<span class="badge badge-info" style="font-size:10.5px">dedutível</span>' : '<span class="badge badge-gray" style="font-size:10.5px">não</span>'}</td>
+                  <td style="text-align:right;font-weight:600;color:var(--danger)">${U.fmt(d.valor)}</td>
+                  <td><div class="td-actions">
+                    <button class="action-btn edit" onclick='editDespProf("${d.id}")'><span class="msi">edit</span></button>
+                    <button class="action-btn delete" onclick='delDespProf("${d.id}")'><span class="msi">delete</span></button>
+                  </div></td>
+                </tr>`).join('')}</tbody></table></div>
+          </div>`).join('')
+          : '<div class="empty-state"><div class="empty-icon"><span class="msi">account_balance_wallet</span></div><p>Nenhuma despesa pessoal neste mês.</p></div>'}
+      </div>`;
+  }
+
+  document.getElementById('content').innerHTML = `
+    <div class="page-header"><h2>Financeiro do Profissional</h2></div>
+    <div class="filters-bar">
+      <div class="month-nav">
+        <button onclick="finNavMes(-1)">‹</button>
+        <div class="month-label-wrap">
+          <div class="month-label" id="fin-month-label"></div>
+          <input type="date" class="month-label-input" id="fin-month-input">
+        </div>
+        <button onclick="finNavMes(1)">›</button>
+      </div>
+      <select class="filter-select" id="fin-prof-filter">
+        ${profs.map(p => `<option value="${p.id}">${U.escHtml(p.nome)}</option>`).join('')}
+      </select>
+    </div>
+    <div id="fin-body"></div>`;
+
+  window.finNavMes = (d) => {
+    state.m += d; if (state.m > 12) { state.m = 1; state.y++; } if (state.m < 1) { state.m = 12; state.y--; }
+    wireMonthPicker('fin', state, draw);
+    draw();
+  };
+
+  const seletor = document.getElementById('fin-prof-filter');
+  seletor.value = state.profId;
+  seletor.onchange = (e) => { state.profId = e.target.value; draw(); };
+
+  wireMonthPicker('fin', state, draw);
+  draw();
+
+  window.editDespProf = (id) => {
+    const d = id ? DB.getOne('despesas_profissional', id) : null;
+    const hoje = new Date();
+    const dataPadrao = d?.data || `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`;
+    const porGrupo = {};
+    TIPOS_DESPESA_PROF.forEach(t => { (porGrupo[t.g] = porGrupo[t.g] || []).push(t); });
+
+    Modal.open(d ? 'Editar despesa pessoal' : 'Nova despesa pessoal', `
+      <div style="display:grid;gap:12px">
+        <div style="display:flex;gap:10px">
+          <div style="flex:1">
+            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Data *</label>
+            <input id="dp-data" type="date" value="${dataPadrao}" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-size:13px">
+          </div>
+          <div style="flex:1">
+            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Valor (R$) *</label>
+            <input id="dp-valor" type="number" step="0.01" min="0" value="${d?.valor ?? ''}" placeholder="0,00" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-size:13px">
+          </div>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Tipo de despesa *</label>
+          <select id="dp-tipo" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-size:13px">
+            ${Object.entries(porGrupo).map(([g, tipos]) => `
+              <optgroup label="${U.escHtml(GRUPOS_DESPESA_PROF[g] || g)}">
+                ${tipos.map(t => `<option value="${t.k}" ${d?.tipo===t.k?'selected':''}>${U.escHtml(t.l)}</option>`).join('')}
+              </optgroup>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Descrição</label>
+          <input id="dp-desc" type="text" value="${U.escHtml(d?.descricao || '')}" placeholder="Opcional" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-size:13px">
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600">
+          <input id="dp-livro" type="checkbox" ${d ? (d.livroCaixa ? 'checked' : '') : ''}>
+          Entra no livro caixa (dedutível)
+        </label>
+        <p style="font-size:11.5px;color:var(--text-muted);margin:0">
+          Marcado automaticamente conforme o tipo escolhido — desmarque se este gasto específico não for dedutível. Na dúvida, confirme com o contador.
+        </p>
+      </div>`,
+      `<button class="btn btn-secondary" onclick="Modal.close()">Cancelar</button>
+       <button class="btn btn-primary" onclick='saveDespProf(${d ? `"${d.id}"` : 'null'})'>Salvar</button>`, 'sm');
+
+    // Trocar o tipo reajusta o padrão do livro caixa — só enquanto o usuário
+    // não mexeu na caixinha, pra não desfazer escolha manual.
+    const chk = document.getElementById('dp-livro');
+    let tocado = !!d;
+    chk.onchange = () => { tocado = true; };
+    const sel = document.getElementById('dp-tipo');
+    const aplicarPadrao = () => { if (!tocado) chk.checked = !!tipoDespesaProf(sel.value)?.livroCaixa; };
+    sel.onchange = aplicarPadrao;
+    if (!d) aplicarPadrao();
+  };
+
+  window.saveDespProf = async (id) => {
+    const data = document.getElementById('dp-data').value;
+    const valor = parseFloat(document.getElementById('dp-valor').value);
+    const tipo = document.getElementById('dp-tipo').value;
+    if (!data) { toast('Informe a data.', 'error'); return; }
+    if (!valor || valor <= 0) { toast('Informe um valor válido.', 'error'); return; }
+
+    const base = id ? DB.getOne('despesas_profissional', id) : {};
+    await DB.save('despesas_profissional', {
+      ...base,
+      ...(id ? { id } : {}),
+      profissionalId: state.profId,
+      data, valor, tipo,
+      descricao: document.getElementById('dp-desc').value.trim(),
+      livroCaixa: document.getElementById('dp-livro').checked,
+      criadoPor: (window.Session && Session.email) || '',
+      criadoEm: base.criadoEm || Date.now(),
+    });
+    Modal.close();
+    toast(id ? 'Despesa atualizada.' : 'Despesa lançada.', 'success');
+    draw();
+  };
+
+  window.delDespProf = (id) => {
+    Modal.confirm('Excluir esta despesa pessoal?', async () => {
+      await DB.remove('despesas_profissional', id);
+      toast('Despesa excluída.', 'success');
+      draw();
+    });
+  };
+}
 
 /* ===== PROFISSIONAIS ===== */
 function renderProfissionais() {
@@ -2366,6 +2712,7 @@ window.renderPacientes = renderPacientes;
 window.renderAtendimentos = renderAtendimentos;
 window.renderCobranca = renderCobranca;
 window.renderDespesas = renderDespesas;
+window.renderFinanceiroProf = renderFinanceiroProf;
 window.renderReceitas = renderReceitas;
 window.renderBalancete = renderBalancete;
 window.updateThemeBtn = updateThemeBtn;
@@ -2396,6 +2743,7 @@ if (typeof renderAtendimentos === "function") window.renderAtendimentos = render
 if (typeof renderCobranca === "function") window.renderCobranca = renderCobranca;
 if (typeof saveCobrancaField === "function") window.saveCobrancaField = saveCobrancaField;
 if (typeof renderDespesas === "function") window.renderDespesas = renderDespesas;
+window.renderFinanceiroProf = renderFinanceiroProf;
 if (typeof drawCatList === "function") window.drawCatList = drawCatList;
 if (typeof drawRecCatList === "function") window.drawRecCatList = drawRecCatList;
 if (typeof renderReceitas === "function") window.renderReceitas = renderReceitas;

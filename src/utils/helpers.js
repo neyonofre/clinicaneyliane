@@ -34,6 +34,75 @@ export const SUBCATS = [
   { k:'4.7',l:'Descartáveis',g:'4' }, { k:'4.8',l:'Reformas',g:'4' }, { k:'4.9',l:'Propaganda e Marketing',g:'4' }, { k:'4.10',l:'Outros (Variáveis)',g:'4' }
 ];
 
+// ── Despesas PESSOAIS do profissional (livro caixa individual) ───────────────
+// Nada a ver com CATS_DESPESA/SUBCATS, que são as despesas DA CLÍNICA e entram
+// no balancete. Estas são do bolso de cada profissional: ficam na coleção
+// despesas_profissional, aparecem só na aba Financeiro dele e nunca no
+// resultado da clínica.
+//
+// "livroCaixa" marca a despesa dedutível — a que o profissional quer ver no
+// próprio livro caixa (Carnê-Leão). Cada tipo traz um padrão, mas o campo é
+// editável no lançamento: o mesmo gasto pode ou não ser dedutível dependendo
+// do caso, e quem decide é o contador, não o app.
+export const GRUPOS_DESPESA_PROF = {
+  prof:      'Profissionais e Carreira',
+  consult:   'Consultório e Trabalho',
+  impostos:  'Impostos e Contribuições',
+  pessoal:   'Pessoais',
+  saude:     'Saúde e Educação',
+  transporte:'Transporte',
+  outros:    'Outros',
+};
+
+export const TIPOS_DESPESA_PROF = [
+  // Profissionais e Carreira — dedutíveis no livro caixa
+  { k:'anuidade_conselho', l:'Anuidade do conselho (CRP/CRM/CRFa…)', g:'prof',      livroCaixa:true },
+  { k:'cursos',            l:'Cursos, congressos e capacitação',     g:'prof',      livroCaixa:true },
+  { k:'supervisao',        l:'Supervisão clínica',                   g:'prof',      livroCaixa:true },
+  { k:'terapia_pessoal',   l:'Terapia/análise pessoal',              g:'prof',      livroCaixa:true },
+  { k:'livros_material',   l:'Livros e material técnico',            g:'prof',      livroCaixa:true },
+  { k:'seguro_prof',       l:'Seguro de responsabilidade civil',     g:'prof',      livroCaixa:true },
+  { k:'assoc_sindicato',   l:'Associação de classe / sindicato',     g:'prof',      livroCaixa:true },
+
+  // Consultório e Trabalho — dedutíveis
+  { k:'aluguel_sala',      l:'Aluguel de sala / sublocação',         g:'consult',   livroCaixa:true },
+  { k:'testes_psico',      l:'Testes e instrumentos de avaliação',   g:'consult',   livroCaixa:true },
+  { k:'material_consult',  l:'Material de consultório',              g:'consult',   livroCaixa:true },
+  { k:'software',          l:'Software e assinaturas profissionais', g:'consult',   livroCaixa:true },
+  { k:'marketing_prof',    l:'Divulgação e marketing próprio',       g:'consult',   livroCaixa:true },
+  { k:'secretaria',        l:'Secretária / apoio administrativo',    g:'consult',   livroCaixa:true },
+  { k:'telefone_trabalho', l:'Telefone e internet do trabalho',      g:'consult',   livroCaixa:true },
+
+  // Impostos e Contribuições — dedutíveis
+  { k:'inss_autonomo',     l:'INSS autônomo (carnê)',                g:'impostos',  livroCaixa:true },
+  { k:'iss',               l:'ISS',                                  g:'impostos',  livroCaixa:true },
+  { k:'contador',          l:'Contador / contabilidade',             g:'impostos',  livroCaixa:true },
+  { k:'carne_leao',        l:'Carnê-Leão (IRPF mensal)',             g:'impostos',  livroCaixa:false },
+
+  // Saúde e Educação — NÃO entram no livro caixa (vão na declaração anual)
+  { k:'plano_saude',       l:'Plano de saúde',                       g:'saude',     livroCaixa:false },
+  { k:'consultas_exames',  l:'Consultas e exames',                   g:'saude',     livroCaixa:false },
+  { k:'educacao_filhos',   l:'Educação (própria ou dependentes)',    g:'saude',     livroCaixa:false },
+
+  // Transporte
+  { k:'combustivel',       l:'Combustível',                          g:'transporte',livroCaixa:false },
+  { k:'estacionamento',    l:'Estacionamento',                       g:'transporte',livroCaixa:false },
+  { k:'app_transporte',    l:'Táxi / aplicativo de transporte',      g:'transporte',livroCaixa:false },
+  { k:'manutencao_veic',   l:'Manutenção do veículo',                g:'transporte',livroCaixa:false },
+
+  // Pessoais
+  { k:'moradia',           l:'Moradia (aluguel, condomínio, contas)',g:'pessoal',   livroCaixa:false },
+  { k:'alimentacao',       l:'Alimentação',                          g:'pessoal',   livroCaixa:false },
+  { k:'lazer',             l:'Lazer e viagens',                      g:'pessoal',   livroCaixa:false },
+  { k:'vestuario',         l:'Vestuário',                            g:'pessoal',   livroCaixa:false },
+
+  { k:'outros_prof',       l:'Outros',                               g:'outros',    livroCaixa:false },
+];
+
+export function tipoDespesaProf(k) {
+  return TIPOS_DESPESA_PROF.find(t => t.k === k) || null;
+}
+
 // Sem o Mini Auditório: reserva avulsa por dia/hora, seção própria do Dashboard.
 export const SALAS = ['Sala 1','Sala 2','Sala 3 (Infantil)','Sala 4','Sala 5'];
 export const DIAS_SEMANA_WORK = ['Seg','Ter','Qua','Qui','Sex','Sáb'];

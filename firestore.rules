@@ -21,7 +21,8 @@ service cloud.firestore {
         collection == 'receitas' ||
         collection == 'custom_subcats' ||
         collection == 'custom_rec_cats' ||
-        collection == 'reservas_auditorio'
+        collection == 'reservas_auditorio' ||
+        collection == 'despesas_profissional'
       );
     }
   }

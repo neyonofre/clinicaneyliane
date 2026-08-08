@@ -1,7 +1,8 @@
 import { DB } from './api/db.js';
 import { setupAuth } from './auth/auth.js';
 import { Router } from './router/index.js';
-import { U, Modal, toast, getAllSubcats, getAllRecCats, REGIMES, TURNOS_LIST, MESES, MESES_SHORT, CATS_DESPESA, SUBCATS, SALAS, DIAS_SEMANA_WORK, TURNOS_NAMES, CATS_RECEITA } from './utils/helpers.js';
+import { U, Modal, toast, getAllSubcats, getAllRecCats, REGIMES, TURNOS_LIST, MESES, MESES_SHORT, CATS_DESPESA, SUBCATS, SALAS, DIAS_SEMANA_WORK, TURNOS_NAMES, CATS_RECEITA,
+  GRUPOS_DESPESA_PROF, TIPOS_DESPESA_PROF, tipoDespesaProf } from './utils/helpers.js';
 import './api/firebase.js';
 
 // Expose new modules to window so legacy code can use them
@@ -22,6 +23,9 @@ window.SALAS = SALAS;
 window.DIAS_SEMANA_WORK = DIAS_SEMANA_WORK;
 window.TURNOS_NAMES = TURNOS_NAMES;
 window.CATS_RECEITA = CATS_RECEITA;
+window.GRUPOS_DESPESA_PROF = GRUPOS_DESPESA_PROF;
+window.TIPOS_DESPESA_PROF = TIPOS_DESPESA_PROF;
+window.tipoDespesaProf = tipoDespesaProf;
 window.Session = { email: null };
 
 // Import legacy UI renderers
@@ -61,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     receitas: { title:'Receitas', render: () => window.renderReceitas && window.renderReceitas() },
     cobranca: { title:'Cobrança Mensal', render: () => window.renderCobranca && window.renderCobranca() },
     despesas: { title:'Despesas', render: () => window.renderDespesas && window.renderDespesas() },
+    financeiro: { title:'Financeiro do Profissional', render: () => window.renderFinanceiroProf && window.renderFinanceiroProf() },
     balancete: { title:'Balancete', render: () => window.renderBalancete && window.renderBalancete() }
   });
 
