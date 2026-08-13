@@ -665,8 +665,28 @@ function renderDashboard() {
 
   const audReservas = DB.get('reservas_auditorio');
   const audHorasDe = (dow) => dow === 0 ? [] : dow === 6 ? [8,9,10,11] : [8,9,10,11,12,13,14,15,16,17,18,19,20];
+  // Uso semanal fixo, cadastrado na ficha do profissional (no Prontuário).
+  // Não existe como documento em reservas_auditorio: é derivado na leitura,
+  // senão este app mostraria "Livre" num horário tomado toda semana.
+  const audFixasDe = (dataISO) => {
+    const dt = U.parseISODate(dataISO);
+    if (!dt || dt.getDay() === 0) return [];
+    const nomeDia = ['Seg','Ter','Qua','Qui','Sex','Sáb'][dt.getDay() - 1];
+    const out = [];
+    DB.get('profissionais').forEach(p => {
+      if (!p.ativo) return;
+      (p.auditorioSemanal || []).forEach(f => {
+        if (f.dia !== nomeDia) return;
+        out.push({ id: '', fixo: true, data: dataISO, horaInicio: f.horaInicio, horaFim: f.horaFim,
+          titulo: (f.titulo || '').trim() || `${p.nome} — uso semanal`, responsavel: p.nome });
+      });
+    });
+    return out;
+  };
   const audReservaEm = (dataISO, h) =>
-    audReservas.find(r => r.data === dataISO && h >= r.horaInicio && h < r.horaFim) || null;
+    audReservas.find(r => r.data === dataISO && h >= r.horaInicio && h < r.horaFim)
+    || audFixasDe(dataISO).find(f => h >= f.horaInicio && h < f.horaFim)
+    || null;
   const hh = (h) => String(h).padStart(2,'0') + 'h';
 
   const audBase = U.parseISODate(audDia) || new Date();
@@ -738,6 +758,7 @@ function renderDashboard() {
     const diasNoMes = new Date(y0, m0 + 1, 0).getDate();
     const offset = new Date(y0, m0, 1).getDay(); // domingo-primeiro
     const horasDoDiaISO = (iso) => audReservas.filter(r => r.data === iso)
+      .concat(audFixasDe(iso))
       .reduce((soma, r) => soma + (r.horaFim - r.horaInicio), 0);
 
     const celulas = [];
@@ -962,6 +983,16 @@ function renderDashboard() {
     const conflito = DB.get('reservas_auditorio').some(r =>
       r.data === dataISO && !(horaFim <= r.horaInicio || hora >= r.horaFim));
     if (conflito) { toast('Esse horário acabou de ser reservado por outra pessoa.', 'error'); renderDashboard(); Modal.close(); return; }
+
+    // Uso semanal fixo vindo da ficha do profissional (cadastrado no
+    // Prontuário). Não tem documento nesta coleção, então o teste acima não o
+    // enxerga — e reservar por cima criaria dois eventos no mesmo horário.
+    const dtRes = U.parseISODate(dataISO);
+    const nomeDiaRes = dtRes && dtRes.getDay() > 0 ? ['Seg','Ter','Qua','Qui','Sex','Sáb'][dtRes.getDay() - 1] : null;
+    const fixoPor = nomeDiaRes && DB.get('profissionais').find(p =>
+      p.ativo && (p.auditorioSemanal || []).some(f =>
+        f.dia === nomeDiaRes && !(horaFim <= f.horaInicio || hora >= f.horaFim)));
+    if (fixoPor) { toast(`Esse horário é uso semanal fixo de ${fixoPor.nome}.`, 'error'); Modal.close(); return; }
 
     await DB.save('reservas_auditorio', {
       data: dataISO, horaInicio: hora, horaFim,
@@ -1584,7 +1615,9 @@ window.saveProf = () => {
   if (!nome) { toast('Nome é obrigatório','error'); return; }
   const regime = g('f-regime')?.value || '';
   if (!regime) { toast('Regime é obrigatório','error'); return; }
+  const existente = (id && DB.getOne('profissionais', id)) || {};
   const base = {
+    ...existente,
     id: id || U.id(),
     nome,
     cpf: g('f-cpf')?.value?.trim() || '',
@@ -1616,6 +1649,7 @@ window.saveProf = () => {
   base.diasSemana = Object.keys(agenda);
   base.turnosTrabalho = [...new Set(Object.values(agenda).flat())];
   base.salasOcupadas = [...document.querySelectorAll('.f-sala:checked')].map(el => el.value);
+  if (JSON.stringify(base.salasOcupadas) !== JSON.stringify(existente.salasOcupadas || [])) delete base.salasPorTurno;
   if (regime === 'sublocacao') { base.valorMensal = U.parseNum(g('f-valorMensal')?.value || '0'); base.valorHoraExtra = U.parseNum(g('f-valorHoraExtra')?.value || '50') || 50; }
   if (regime === 'hora') { base.valorHora = U.parseNum(g('f-valorHora')?.value || '0'); }
   if (regime === 'cliente') { base.valorPorCliente = U.parseNum(g('f-valorPorCliente')?.value || '0'); }
