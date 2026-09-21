@@ -1544,6 +1544,7 @@ window.editProf = (id) => {
         <div class="form-group form-full"><label>Nome Completo *</label><input id="f-nome" value="${U.escHtml(v('nome'))}" required></div>
         <div class="form-group"><label>CPF</label><input id="f-cpf" value="${U.escHtml(v('cpf'))}"></div>
         <div class="form-group"><label>CNPJ</label><input id="f-cnpj" value="${U.escHtml(v('cnpj'))}"></div>
+        <div class="form-group"><label>Data de Nascimento</label><input id="f-dataNascimento" type="date" value="${v('dataNascimento')}"></div>
         <div class="form-group"><label>Profissão *</label><input id="f-profissao" value="${U.escHtml(v('profissao'))}" required></div>
         <div class="form-group"><label>Especialidade</label><input id="f-especialidade" value="${U.escHtml(v('especialidade'))}"></div>
         <div class="form-group"><label>Conselho</label><input id="f-conselho" value="${U.escHtml(v('conselho'))}"></div>
@@ -1622,6 +1623,7 @@ window.saveProf = () => {
     nome,
     cpf: g('f-cpf')?.value?.trim() || '',
     cnpj: g('f-cnpj')?.value?.trim() || '',
+    dataNascimento: g('f-dataNascimento')?.value || '',
     profissao: g('f-profissao')?.value?.trim() || '',
     especialidade: g('f-especialidade')?.value?.trim() || '',
     conselho: g('f-conselho')?.value?.trim() || '',
